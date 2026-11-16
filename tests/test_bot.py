@@ -17,6 +17,7 @@ TEST_CFG = {
     "llm": {"enabled": True, "url": "http://localhost:11434", "model": "m", "context_messages": 5,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": ["a"]},
+    "commands": {"cooldown_seconds": 10, "items": [{"trigger": "!abone", "response": "abone olmak için link"}]},
 }
 
 
@@ -94,7 +95,8 @@ class Rules(unittest.TestCase):
         for path, bad in ((("caps", "streak"), 0), (("caps", "streak"), "5"), (("caps", "streak"), True),
                           (("blacklist", "timeout_minutes"), 10081), (("channel",), "yok"),
                           (("channels",), [{"slug": "../x", "chatroom_id": 1, "broadcaster_user_id": 1}]),
-                          (("announcements", "messages"), ["x" * 501]), (("channel",), "")):
+                          (("announcements", "messages"), ["x" * 501]), (("channel",), ""),
+                          (("commands", "items"), [{"trigger": "iki kelime", "response": "x"}])):
             cfg = copy.deepcopy(TEST_CFG)
             target = cfg
             for key in path[:-1]:
@@ -214,6 +216,20 @@ class Handle(unittest.TestCase):
         panel.action({"id": item["id"], "action": "close"})
         self.assertEqual(db.open_count(), 0)
         self.assertIn("15 dk timeout", db.violation(item["id"])["notes"])
+
+    def test_command(self, llm, kick):
+        moderation._last.clear()
+        moderation.handle(event("!ABONE nasıl olunur", uid=8))
+        kick.send.assert_called_once_with("@u8 abone olmak için link")
+        moderation.handle(event("!abone", uid=9))               # bekleme süresi dolmadan ikinci cevap yok
+        moderation.handle(event("!abonelik ne", uid=9))         # başka kelime
+        self.assertEqual(kick.send.call_count, 1)
+        moderation._last.clear()
+        moderation.handle(event("bana !abone linki ver", uid=9))  # mesajın ortasında da çalışır
+        kick.send.assert_called_with("@u9 abone olmak için link")
+        moderation._last.clear()
+        moderation.handle(event("!abone", uid=1, badges=["broadcaster"]))  # muaf kullanıcılar da kullanabilir
+        self.assertEqual(kick.send.call_count, 3)
 
     def test_start_needs_chatroom(self, llm, kick):
         self.addCleanup(STATE.update, running=False)

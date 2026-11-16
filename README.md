@@ -10,6 +10,7 @@ duyuru yazan sen görünürsün. Bot senin bilgisayarında çalışır, yönetim
 - **Hedefliyse yasak kelime:** kelime tek başına serbesttir, birine yöneltilmişse inceleme listesine düşer.
 - **Caps:** art arda tamamı büyük harf yazana timeout atar.
 - **Etiket:** biri seni `@nick` ile etiketlerse son mesajlar inceleme listesine düşer.
+- **Komutlar:** biri `!abone` gibi bir komut yazınca bot onu etiketleyerek ayarladığın cevabı yazar.
 - **Duyurular:** yalnızca yayın açıkken, rastgele sırayla, ayarladığın aralıklarla chate yazılır.
 - **İnceleme:** botun yaptığı her şey kanıt mesajlarıyla kayıtlıdır; oradan mesaj silebilir, timeout ya da ban atabilir,
   cezayı kaldırabilirsin.

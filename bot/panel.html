@@ -121,7 +121,7 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
 <script>
 "use strict";
 // Chat mesajları güvenilmeyen içeriktir: sayfaya yalnızca metin düğümü olarak eklenir, asla HTML olarak değil.
-const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Caps"], ["duyuru", "Duyurular"], ["model", "Model"], ["inceleme", "İnceleme"]];
+const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Caps"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["model", "Model"], ["inceleme", "İnceleme"]];
 const RULES = { blacklist: "Yasaklı kelime", caps: "Caps", etiket: "Etiket", llm: "Model", hedefli: "Hedefli kelime" };
 const ACTIONS = { delete: "mesaj silindi", timeout: "timeout atıldı", ban: "banlandı", inceleme: "inceleme bekliyor", sil: "model sildi", serbest: "model serbest bıraktı" };
 let cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
@@ -355,6 +355,20 @@ const VIEWS = {
         num("announcements.gap_minutes", "İki duyuru arası (dk)"),
         num("announcements.repeat_min_minutes", "Aynı duyuru en erken (dk)", "Bu süre dolmadan aynı duyuru tekrar atılmaz."),
         num("announcements.repeat_max_minutes", "Aynı duyuru en geç (dk)", "Bu süre dolunca o duyuru öne alınır.")))];
+  },
+  komut() {
+    const list = cfg.commands.items;
+    return [...head("Komutlar", "Biri chate komutu yazınca bot onu etiketleyerek cevabı yazar. Örnek: ahmet \"!abone\" yazarsa bot \"@ahmet abone olmak için …\" yazar."),
+      card("Komut listesi",
+        list.length ? list.map((c, i) => h("div", { class: "row", style: "margin-bottom:8px;align-items:flex-start" },
+          h("input", { type: "text", style: "width:150px", maxlength: 30, placeholder: "!komut", value: c.trigger, oninput: e => { c.trigger = e.target.value.trim(); markDirty(); } }),
+          h("div", { class: "grow" }, h("textarea", { maxlength: 450, placeholder: "cevap metni", value: c.response, oninput: e => { c.response = e.target.value; markDirty(); } })),
+          h("button", { class: "x", title: "Sil", onclick: () => { list.splice(i, 1); markDirty(); render(); } }, "×")))
+          : h("div", { class: "empty", style: "margin-bottom:10px" }, "Henüz komut yok."),
+        h("button", { class: "btn", onclick: () => { list.push({ trigger: "!komut", response: "cevap metni" }); markDirty(); render(); } }, "Komut ekle"),
+        h("p", { class: "hint" }, "Komut tek kelime olmalı; mesajın neresinde geçerse geçsin çalışır (\"bana !abone linki ver\"). Büyük/küçük harf fark etmez. Bir mesajda birden fazla komut varsa listede önce gelen cevaplanır. Komutlar yayın kapalıyken de çalışır ve herkes kullanabilir.")),
+      card("Bekleme", h("div", { class: "grid" },
+        num("commands.cooldown_seconds", "Aynı komut için bekleme (sn)", "Bu süre içinde aynı komut tekrar yazılırsa bot cevap vermez; chat dolmasın diye.")))];
   },
   model() {
     return [...head("Model", "Açıkken iki işe bakar: nick'in etiketlendiğinde son mesajları yorumlar ve \"hedefliyse yasak\" kelimelerin birine yöneltilip yöneltilmediğine karar verir. Kapalıyken ikisi de doğrudan İnceleme kuyruğuna düşer."),

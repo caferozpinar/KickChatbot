@@ -30,6 +30,7 @@ DEFAULT = {
     "llm": {"enabled": False, "url": "http://localhost:11434", "model": "gemma4:e2b", "context_messages": 5,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": []},
+    "commands": {"cooldown_seconds": 10, "items": []},
 }
 
 # Ayar dosyasının biçimi. Listelerdeki tek eleman, liste elemanlarının şablonudur.
@@ -42,8 +43,9 @@ SHAPE = {
     "llm": {"enabled": False, "url": "", "model": "", "context_messages": 1,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 1, "repeat_min_minutes": 1, "repeat_max_minutes": 1, "messages": [""]},
+    "commands": {"cooldown_seconds": 1, "items": [{"trigger": "", "response": ""}]},
 }
-_LIMITS = {"examples": 20000, "messages": 500, "url": 200}  # metin uzunluk sınırları (varsayılan 100)
+_LIMITS = {"examples": 20000, "messages": 500, "url": 200, "response": 450, "trigger": 30}  # metin uzunluk sınırları (varsayılan 100)
 
 
 def _check(value, ref, path, key=""):
@@ -61,6 +63,8 @@ def _check(value, ref, path, key=""):
         value = value.strip()
         if len(value) > _LIMITS.get(key, 100) or (not value and key not in ("examples", "nick", "channel")):  # nick ve kanal kurulumda dolar
             raise ValueError(f"{path}: boş ya da çok uzun")
+        if key == "trigger" and " " in value:
+            raise ValueError(f"{path}: komut tek kelime olmalı (ör. !abone)")
         if key == "slug" and not re.fullmatch(r"[A-Za-z0-9_-]{1,25}", value):  # dosya adında kullanılıyor
             raise ValueError(f"{path}: kanal adı yalnızca harf, rakam, _ ve - içerebilir")
     elif isinstance(ref, int) and not isinstance(ref, bool):
@@ -81,7 +85,8 @@ def validate(cfg):
     return cfg
 
 
-CFG = validate(json.loads(CONFIG.read_text(encoding="utf-8")) if CONFIG.exists() else copy.deepcopy(DEFAULT))
+# Eski sürümün ayar dosyasında yeni eklenen bölümler yoktur; eksikleri varsayılanla tamamla.
+CFG = validate({**copy.deepcopy(DEFAULT), **(json.loads(CONFIG.read_text(encoding="utf-8")) if CONFIG.exists() else {})})
 
 
 def save(cfg):

@@ -1,5 +1,5 @@
 """Her chat mesajına kuralları uygular: yasaklı kelime, caps, etiket."""
-import threading
+import threading, time
 
 from . import CFG, db, kick, llm, rules
 
@@ -8,6 +8,23 @@ def blacklist(targeted=False):
     """targeted=False: her zaman yasak kelimeler. True: yalnızca birine yöneltilmişse yasak olanlar."""
     return rules.load_blacklist(("*" if w["anywhere"] else "") + w["word"]
                                 for w in CFG["blacklist"]["words"] if w["targeted"] == targeted)
+
+
+_last = {}  # komut -> son cevaplanma zamanı
+
+
+def command(text, name):
+    """Mesajın herhangi bir yerinde bir komut geçiyorsa (ör. !abone) yazanı etiketleyerek cevabını chate yazar."""
+    c, words = CFG["commands"], text.lower().split()
+    for item in c["items"]:
+        trigger = item["trigger"].lower()
+        if trigger in words:
+            if time.time() - _last.get(trigger, 0) >= c["cooldown_seconds"]:  # aynı komuta art arda yazılınca chat dolmasın
+                _last[trigger] = time.time()
+                print(f"[komut] {name}: {trigger}", flush=True)
+                kick.send(f"@{name} {item['response']}")
+            return True
+    return False
 
 
 def from_websocket(m, broadcaster_id):
@@ -56,6 +73,8 @@ def handle(ev):
                 return
         else:
             db.reset(uid, "caps")
+    if command(text, name):
+        return
     if CFG["nick"] and rules.mentions(text, CFG["nick"]) and uid != ev["broadcaster"]["user_id"]:
         if CFG["llm"]["enabled"]:
             print(f"[etiket] {name}: {text!r} -> model yorumluyor...", flush=True)
