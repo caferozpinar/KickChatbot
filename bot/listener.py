@@ -3,7 +3,7 @@ import json, time, urllib.request, uuid
 
 from websockets.sync.client import connect
 
-from . import STATE
+from . import SSL, STATE
 
 AUTH = "https://web.kick.com/api/v1/realtime/auth/connection"
 # shortcut: adres sabit yazıldı; Kick bölgeyi değiştirirse web.kick.com/api/v1/realtime/connection cevabından okunmalı
@@ -14,7 +14,7 @@ REFRESH = 30 * 60  # misafir token'ı 45 dk geçerli
 def _token(client_id):
     req = urllib.request.Request(AUTH, json.dumps({"client_id": client_id}).encode(),
                                  {"Content-Type": "application/json", "User-Agent": "kick-bot"})
-    with urllib.request.urlopen(req, timeout=15) as r:
+    with urllib.request.urlopen(req, timeout=15, context=SSL) as r:
         return json.load(r)["data"]["token"]
 
 
@@ -34,7 +34,7 @@ def messages(get_room):
             if not room:
                 time.sleep(1)
                 continue
-            with connect(WS) as ws:
+            with connect(WS, ssl=SSL) as ws:
                 ws.send(json.dumps({"connect": {"token": _token(client_id), "name": "js"}, "id": 1}))
                 ws.send(json.dumps({"subscribe": {"channel": f"chatrooms.{room}.v2", "flag": 1}, "id": 2}))
                 renew = time.time() + REFRESH

@@ -2,7 +2,7 @@
 import base64, copy, hashlib, http.server, json, secrets, threading, time, tomllib
 import urllib.error, urllib.parse, urllib.request
 
-from . import CFG, DATA, channel, save
+from . import CFG, DATA, SSL, channel, save
 
 AUTH = "https://id.kick.com/oauth"
 API = "https://api.kick.com/public/v1"
@@ -40,7 +40,7 @@ def _http(method, url, *, form=None, body=None, token=None):
     if token:
         headers["Authorization"] = "Bearer " + token
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, data, headers, method=method), timeout=20) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, data, headers, method=method), timeout=20, context=SSL) as r:
             raw = r.read()
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"{method} {url} -> {e.code} {e.read()[:300]!r}") from None
@@ -84,7 +84,9 @@ class _Callback(http.server.BaseHTTPRequestHandler):
             self.send_response(400)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
-            self.wfile.write(f"Giriş başarısız: {e}\n\nClient ID ve Client Secret değerlerini kontrol edip panelden yeniden dene.".encode())
+            hint = ("İnternet bağlantını kontrol edip panelden yeniden dene." if isinstance(e, OSError)
+                    else "Client ID ve Client Secret değerlerini kontrol edip panelden yeniden dene.")
+            self.wfile.write(f"Giriş başarısız: {e}\n\n{hint}".encode())
 
     def log_message(self, *a):
         pass

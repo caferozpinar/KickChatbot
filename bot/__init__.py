@@ -1,5 +1,5 @@
 """Ortak durum: ayarlar (config.json), doğrulama ve botun anlık durumu."""
-import copy, json, os, re, sys
+import copy, json, os, re, ssl, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -16,6 +16,14 @@ def _data_dir():
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+
+# Windows'un kendi sertifika deposu eksik olabiliyor (yeni kurulumlar, Wine); certifi'nin listesi de eklenir.
+SSL = ssl.create_default_context()
+try:
+    import certifi
+    SSL.load_verify_locations(certifi.where())
+except ImportError:
+    pass
 
 DATA = _data_dir()
 CONFIG = DATA / "config.json"
