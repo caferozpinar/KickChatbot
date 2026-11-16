@@ -77,8 +77,11 @@ def validate(cfg):
     """Biçimi ve sınırları denetler; temizlenmiş ayarı döndürür, sorun varsa ValueError."""
     cfg = _check(cfg, SHAPE, "ayar")
     slugs = [c["slug"].lower() for c in cfg["channels"]]
-    if len(set(slugs)) != len(slugs) or ((slugs or cfg["channel"]) and cfg["channel"].lower() not in slugs):
-        raise ValueError("Seçili kanal, kanal listesinde olmalı ve kanal adları benzersiz olmalı")
+    twice = next((s for s in slugs if slugs.count(s) > 1), None)
+    if twice:
+        raise ValueError(f"'{twice}' kanalı listede iki kez var; birini kaldır")
+    if (slugs or cfg["channel"]) and cfg["channel"].lower() not in slugs:
+        raise ValueError(f"Seçili kanal ('{cfg['channel']}') kanal listesinde yok")
     a = cfg["announcements"]
     if a["repeat_min_minutes"] > a["repeat_max_minutes"]:
         raise ValueError("Duyuru tekrar süresinde en az, en çoktan büyük olamaz")

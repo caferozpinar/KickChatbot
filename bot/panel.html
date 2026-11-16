@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>kick-bot paneli</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACoElEQVR42u2XS29cRRCFv9OPmZGDg5xIIEhYIHnBFokVKBKChPCD2SA5IAWJTRb8BmQgUohRLI89j9vdJ4s7IpPE9ngyRgaRXvat7jp9qupUXQHmClfgitdbAGmlhc7Y9xvanXLM/1oGJBFzXMD0El5Ru4ptEIje7lUSbKhlYbcWgIWfECNff/cRo91KnfeOSA2OBjz45ndO/pyCIW8l7u7dJr1fcAkYE5KpjwfsfbvPbDw/k+uVOTDabQw/ntEIixc2mAaUhQRxkMjvZkafmLQzw0TACFO2Ew4bJmGbQWuB1oEEJMFEtGkjx8y9n26TPihoVKgl9q+0IEGbGHnjKhAKoLAITQBFk7cTio3Rrgk7c1oNL4VP6s+yMYDlGwRugq3Clz/fwG54q6OV8HoZyii1S9CBV26WATUGH1aEaPUUvE14nGmH6RyBuDCAM3gp6rnRy86VTHcQeXjnkPnTQjfpzhWk9UKwSvksdJzxX+Jkf8ps3K0iYP0QnIVRydTDxA+fHzB5MqObtQvpbHhjBk6Daignpkzcg7qcbqgLmbiKsF25+8tN7j+6RR6lF+r9TyTh38QsOXA06WYHiozeG0IU3XhOq778ECgZpde/tSLCNfPVo+vcf3iLvJXPJXL9JBTYoj2J2CLtVByWAi4gmnSjonlemUHrMWAgGB1nfvzikAefHuBxJJyieLb6/rGxEnoxCni5ycP0oKMcVeb7Q3IJ6HrpW/V6hbOaAQ0gqKGBUTaS0QDyKFBr4fs7v7L32VN8nAip9bmxZOdNGBBQHke6d4a0+WIvg55lWjW2mR91uEH3W8RlAJ0wQhnKH3FlO16pVcPtDOFFW9UiqLOjDrc++YJEvpYgCHkxtEnYpht3tOb/6FD6vxjL3/6aXTmA5xZKL25vOrDHAAAAAElFTkSuQmCC">
 <style>
 :root {
   --bg: #0b0e0f; --panel: #14181a; --raised: #1b2023; --line: #262d31; --text: #e8ecee; --muted: #8b979d;
@@ -185,7 +186,8 @@ async function saveCfg(message) {
     await api("/api/config", cfg);
     saved = ""; cfg = null; await poll(); render(); itemsKey = ""; if (page === "inceleme") await loadItems();
     toast(message || "Kaydedildi, bot yeni ayarlarla çalışıyor");
-  } catch (e) { toast(e.message, true); }
+    return true;
+  } catch (e) { toast(e.message, true); if (cfg) render(); return false; }  // ekran her zaman bellekteki ayarı göstersin
 }
 // Chat odası numarasını Kick yalnızca kendi sitesinde veriyor: kullanıcı sayfayı kendi tarayıcısında açıp yapıştırır.
 function roomHelper(c) {
@@ -194,8 +196,11 @@ function roomHelper(c) {
     if (!t.trim()) return;
     if (m && !t.toLowerCase().includes(`"slug":"${c.slug.toLowerCase()}"`)) return toast(`Yapıştırdığın sayfa ${c.slug} kanalına ait değil`, true);
     if (!m && !plain) return toast("Bu yazıda chat odası bulunamadı. Sayfanın tamamını kopyaladığından emin ol (Ctrl+A, sonra Ctrl+C).", true);
-    c.chatroom_id = Number((m || plain)[1]);
-    saveCfg(`${c.slug} kanalının chat odası bağlandı`);
+    // Sayfa çizildikten sonra ayar yenilenmiş olabilir: kanalı güncel listeden adıyla bul.
+    const ch = cfg.channels.find(x => x.slug.toLowerCase() === c.slug.toLowerCase());
+    if (!ch) return toast(`${c.slug} kanalı listede yok; sayfayı yenileyip yeniden dene`, true);
+    ch.chatroom_id = Number((m || plain)[1]);
+    saveCfg(`${c.slug} kanalının chat odası bağlandı`).then(ok => { if (!ok) ch.chatroom_id = 0; });
   } });
   return h("div", null,
     h("ol", { class: "steps" },
@@ -251,11 +256,13 @@ const VIEWS = {
     async function addChannel() {
       const s = slug.value.trim();
       if (!s) return toast("Kanal adı gerekli", true);
+      if (cfg.channels.some(c => c.slug.toLowerCase() === s.toLowerCase()))
+        return toast(`${s} zaten listede. Chat odası bağlı değilse aşağıdaki kutudan bağla.`, true);
       try {
         const { broadcaster_user_id } = await api("/api/resolve", { slug: s });
         cfg.channels.push({ slug: s, chatroom_id: 0, broadcaster_user_id });
         if (!cfg.channel) cfg.channel = s;
-        await saveCfg(`${s} eklendi; şimdi chat odasını bağla`);
+        if (!await saveCfg(`${s} eklendi; şimdi aşağıdaki kutudan chat odasını bağla`)) { cfg.channels.pop(); render(); }  // kaydedilemediyse listede yarım kalmasın
       } catch (e) { toast(e.message, true); }
     }
     return [

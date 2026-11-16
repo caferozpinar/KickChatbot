@@ -106,6 +106,10 @@ class Rules(unittest.TestCase):
                 validate(cfg)
         self.assertEqual(validate(copy.deepcopy(DEFAULT)), DEFAULT)   # yeni kurulum: kanal ve nick henüz yok
         cfg = copy.deepcopy(TEST_CFG)
+        cfg["channels"].append({"slug": "TEST", "chatroom_id": 0, "broadcaster_user_id": 1})  # büyük/küçük harf farkıyla aynı kanal
+        with self.assertRaisesRegex(ValueError, "iki kez"):
+            validate(cfg)
+        cfg = copy.deepcopy(TEST_CFG)
         cfg["fazla"] = 1
         with self.assertRaises(ValueError):
             validate(cfg)
