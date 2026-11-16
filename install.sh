@@ -1,7 +1,7 @@
 #!/bin/sh
 # kick-bot Linux kurulumu: son sürümü indirir ve uygulama menüsüne ekler. Güncellemek için yeniden çalıştır.
 set -eu
-REPO="GITHUB_KULLANICI_ADI/kick-bot"
+REPO="caferozpinar/KickChatbot"
 BIN="$HOME/.local/bin/kick-bot"
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
 echo "kick-bot indiriliyor..."

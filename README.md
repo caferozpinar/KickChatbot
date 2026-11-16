@@ -27,7 +27,7 @@ duyuru yazan sen görünürsün. Bot senin bilgisayarında çalışır, yönetim
 ### Linux
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/GITHUB_KULLANICI_ADI/kick-bot/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/caferozpinar/KickChatbot/main/install.sh | sh
 ```
 
 Sonra uygulama menüsünden **kick-bot**'u aç.
