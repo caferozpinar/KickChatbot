@@ -4,15 +4,16 @@ import threading
 import unittest
 from unittest import mock
 
-from bot import CFG, DEFAULT, STATE, announcer, db, listener, llm, moderation, panel, rules, validate
+from bot import CFG, DEFAULT, STATE, migrate, announcer, db, listener, llm, moderation, panel, rules, validate
 
 llm_real = llm  # Handle testlerinde "llm" parametresi sahte modüldür
 
 TEST_CFG = {
     "dry_run": True, "nick": "Charasy", "exempt_badges": ["broadcaster", "moderator", "vip"],
     "channel": "test", "channels": [{"slug": "test", "chatroom_id": 1, "broadcaster_user_id": 1}],
-    "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [{"word": "yarrak", "anywhere": False, "targeted": False},
-                                                                              {"word": "amk", "anywhere": False, "targeted": True}]},
+    "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [
+        {"word": "yarrak", "match": "variants", "targeted": False, "action": "standard", "minutes": 0},
+        {"word": "amk", "match": "variants", "targeted": True, "action": "standard", "minutes": 0}]},
     "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5},
     "llm": {"enabled": True, "url": "http://localhost:11434", "model": "m", "context_messages": 5,
             "dry_run": True, "examples": ""},
@@ -32,28 +33,40 @@ event.n = 0
 
 
 class Rules(unittest.TestCase):
+    @staticmethod
+    def hit(text, word, match="variants"):
+        found = rules.blacklist_hit(text, [{"word": word, "match": match, "action": "standard"}])
+        return found and found[1]
+
     def test_blacklist(self):
-        words, parts = rules.load_blacklist(["# yorum", "yarrak", "*salak"])
-        for hit in ("yarrak", "YARRRRRRAK", "sen yaaarrraaak", "salaksın", "SALAAAK"):
-            self.assertTrue(rules.blacklist_hit(hit, words, parts), hit)
-        for clean in ("yarın", "yarraklar", "selam [emote:1:yarrak]"):  # ekli hal yalnızca * ile yakalanır
-            self.assertIsNone(rules.blacklist_hit(clean, words, parts), clean)
+        for hit in ("yarrak", "YARRRRRRAK", "sen yaaarrraaak"):
+            self.assertTrue(self.hit(hit, "yarrak"), hit)
+        for clean in ("yarın", "yarraklar", "selam [emote:1:yarrak]"):  # ekli hal yalnızca "her yerde" ile yakalanır
+            self.assertIsNone(self.hit(clean, "yarrak"), clean)
+        for hit in ("salaksın", "SALAAAK"):
+            self.assertTrue(self.hit(hit, "salak", "anywhere"), hit)
 
     def test_blacklist_evasion(self):
-        words, parts = rules.load_blacklist(["şeftali"])
         for hit in ("seftali", "ŞEFTALİ", "ş e f t a l i", "s.e.f.t.a.l.i", "seftal1", "s3ft4li", "bu bir Ş E F T A L İ işte"):
-            self.assertTrue(rules.blacklist_hit(hit, words, parts), hit)
+            self.assertTrue(self.hit(hit, "şeftali"), hit)
         for clean in ("şeftalili", "sen ve ben", "saat 5 te 1 elma", "sftali"):  # sesli harf düşürme yakalanmaz
-            self.assertIsNone(rules.blacklist_hit(clean, words, parts), clean)
-        words, parts = rules.load_blacklist(["sik", "*göt"])
-        for hit in ("sik kafalı", "s1k", "gotlek", "GÖÖÖT"):
-            self.assertTrue(rules.blacklist_hit(hit, words, parts), hit)
-        for clean in ("sık kafalı", "şık", "güt"):  # mesajdaki Türkçe harf başka harfin yerine sayılmaz
-            self.assertIsNone(rules.blacklist_hit(clean, words, parts), clean)
+            self.assertIsNone(self.hit(clean, "şeftali"), clean)
+        for hit in ("sik kafalı", "s1k"):
+            self.assertTrue(self.hit(hit, "sik"), hit)
+        self.assertTrue(self.hit("GÖÖÖT", "göt", "anywhere"))
+        for clean in ("sık kafalı", "şık"):  # mesajdaki Türkçe harf başka harfin yerine sayılmaz
+            self.assertIsNone(self.hit(clean, "sik"), clean)
+
+    def test_blacklist_exact(self):
+        for hit in ("oç", "OÇ", "sen oç!", "OÇ oç"):
+            self.assertEqual(self.hit(hit, "oç", "exact").lower(), "oç", hit)
+        for clean in ("oc", "o ç", "0ç", "oçç", "oçlar", "koç", "[emote:1:oç]"):  # birebir: türev, uzatma, ek yok
+            self.assertIsNone(self.hit(clean, "oç", "exact"), clean)
 
     def test_blacklist_action(self):
         self.assertEqual([rules.blacklist_action(n, 3) for n in (1, 2, 3, 4, 5)],
                          ["delete", "delete", "timeout", "ban", "ban"])
+        self.assertEqual([rules.blacklist_action(1, 3, a) for a in ("delete", "timeout", "ban")], ["delete", "timeout", "ban"])
 
     def test_caps(self):
         self.assertTrue(rules.is_caps("NE DİYORSUN IŞIK", 4))
@@ -131,6 +144,39 @@ class Handle(unittest.TestCase):
         self.assertEqual(kick.timeout.call_count, 1)   # 3. ihlal
         self.assertEqual(kick.ban.call_count, 1)       # 4. ihlal
         self.assertEqual([v["action"] for v in db.violations(9)][::-1], ["delete", "delete", "timeout", "ban"])
+
+    def test_word_actions(self, llm, kick):
+        CFG["blacklist"]["words"] += [
+            {"word": "oç", "match": "exact", "targeted": False, "action": "ban", "minutes": 0},
+            {"word": "mal", "match": "exact", "targeted": False, "action": "timeout", "minutes": 30},
+            {"word": "hoppa", "match": "exact", "targeted": False, "action": "delete", "minutes": 0}]
+        moderation.handle(event("oc"))                       # birebir değil: dokunulmaz
+        kick.delete.assert_not_called()
+        moderation.handle(event("hoppa", uid=3))             # yalnızca sil: ceza ve sayaç yok
+        moderation.handle(event("hoppa", uid=3))
+        kick.timeout.assert_not_called()
+        moderation.handle(event("sen mal", uid=4))           # kelimenin kendi süresi
+        kick.timeout.assert_called_once_with(4, 30, "Yasaklı kelime")
+        CFG["blacklist"]["words"][-2]["action"] = "standard"  # süre yalnızca doğrudan timeout'ta geçerli; unutulmuş 30 dk uygulanmaz
+        CFG["blacklist"]["strikes_before_timeout"] = 1
+        moderation.handle(event("mal", uid=6))
+        kick.timeout.assert_called_with(6, 10, "Yasaklı kelime")
+        CFG["blacklist"]["words"][-2]["action"] = "timeout"
+        moderation.handle(event("yarrak oç", uid=7))         # iki kelime birden: ağır olan (ban) kazanır, listedeki sıra önemsiz
+        kick.ban.assert_called_with(7, "Yasaklı kelime")
+        kick.ban.reset_mock()
+        moderation.handle(event("OÇ", uid=5))                # ilk seferde doğrudan ban
+        kick.ban.assert_called_once()
+        by = {u["user_id"]: u for u in db.users()}
+        self.assertEqual((by[3]["deleted"], by[3]["strikes"]), (2, 0))
+        self.assertEqual((by[4]["timeouts"], by[4]["strikes"]), (1, 1))
+        self.assertEqual((by[5]["bans"], by[5]["deleted"]), (1, 1))
+
+    def test_migrate(self, llm, kick):
+        old = {"blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [
+            {"word": "a", "anywhere": False, "targeted": False}, {"word": "b", "anywhere": True, "targeted": True}]}}
+        words = validate(migrate(old))["blacklist"]["words"]
+        self.assertEqual([(w["match"], w["action"], w["minutes"]) for w in words], [("variants", "standard", 0), ("anywhere", "standard", 0)])
 
     def test_caps_streak(self, llm, kick):
         for _ in range(4):

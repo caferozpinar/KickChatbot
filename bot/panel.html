@@ -64,6 +64,21 @@ textarea { resize: vertical; min-height: 64px; }
   border-radius: 99px; padding: 4px 6px 4px 12px; }
 .chip .kind { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; cursor: pointer; background: none; }
 .chip .kind.any { color: var(--warn); border-color: var(--warn); }
+.words { display: flex; flex-direction: column; gap: 6px; }
+.word { display: grid; grid-template-columns: minmax(120px, 1fr) 190px auto auto; gap: 8px; align-items: center; background: var(--raised);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.word .sum { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.word .sum b { color: var(--warn); font-weight: 600; }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; max-width: 520px; width: calc(100% - 32px); }
+dialog::backdrop { background: rgba(0,0,0,.6); }
+dialog h2 { margin: 0 0 4px; font-size: 16px; } dialog .field { margin-top: 14px; }
+.opts { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.opts label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.opts label.on { border-color: var(--accent); } .opts b { display: block; font-weight: 600; }
+table.usertable { width: 100%; border-collapse: collapse; } table.usertable th, table.usertable td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+table.usertable th { color: var(--muted); font-weight: 600; font-size: 12px; } table.usertable td.n { text-align: right; font-variant-numeric: tabular-nums; }
+table.usertable th.n { text-align: right; } .flag { color: var(--danger); font-weight: 700; } .zero { color: var(--muted); }
+@media (max-width: 760px) { .word { grid-template-columns: 1fr auto auto; } .word select { grid-column: 1 / -1; } }
 .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
 .x:hover { color: var(--danger); }
 .empty { color: var(--muted); padding: 26px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
@@ -122,10 +137,10 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
 <script>
 "use strict";
 // Chat mesajları güvenilmeyen içeriktir: sayfaya yalnızca metin düğümü olarak eklenir, asla HTML olarak değil.
-const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Caps"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["model", "Model"], ["inceleme", "İnceleme"]];
-const RULES = { blacklist: "Yasaklı kelime", caps: "Caps", etiket: "Etiket", llm: "Model", hedefli: "Hedefli kelime" };
-const ACTIONS = { delete: "mesaj silindi", timeout: "timeout atıldı", ban: "banlandı", inceleme: "inceleme bekliyor", sil: "model sildi", serbest: "model serbest bıraktı" };
-let cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
+const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Büyük harf"], ["kullanici", "Kullanıcılar"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["model", "Yapay zekâ"], ["inceleme", "İnceleme"]];
+const RULES = { blacklist: "Yasaklı kelime", caps: "Büyük harf", etiket: "Etiket", llm: "Yapay zekâ", hedefli: "Hedefli kelime", panel: "Elle" };
+const ACTIONS = { delete: "mesaj silindi", timeout: "susturuldu (timeout)", ban: "banlandı", inceleme: "inceleme bekliyor", sil: "model sildi", serbest: "model serbest bıraktı" };
+let users = null, cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
 
 const $ = id => document.getElementById(id);
 function h(tag, props, ...kids) {
@@ -178,6 +193,49 @@ function toggle(path, label, hint) {
 const card = (title, ...kids) => h("section", { class: "card" }, title && h("h2", null, title), ...kids);
 const head = (title, lead) => [h("h1", null, title), h("p", { class: "lead" }, lead)];
 
+// ---- yasaklı kelime seçenekleri
+const BADGE_NAMES = { broadcaster: "Yayıncı", moderator: "Moderatör", vip: "VIP", og: "OG", subscriber: "Abone", founder: "Kurucu" };
+const MATCH_NAMES = { exact: "Birebir", variants: "Türevleriyle", anywhere: "Her yerde" };
+const MATCH_HELP = {
+  exact: "Kelime tam olarak yazıldığı gibi aranır; yalnızca büyük/küçük harf fark etmez. \"oç\" yasaksa \"oc\", \"o ç\", \"oçç\" ve \"oçlar\" serbest kalır.",
+  variants: "Kelime ayrı bir sözcük olarak aranır, ama kaçamak yazımlar da yakalanır: harf uzatma (\"oççç\"), Türkçe harfsiz yazım (\"seftali\"), boşluklu (\"ş e f t a l i\") ve rakamlı (\"seftal1\"). Ekli hâller (\"oçlar\") yakalanmaz.",
+  anywhere: "Türevleriyle aynı, ayrıca başka bir sözcüğün içinde geçse bile yakalar (\"koç\" içindeki \"oç\" gibi). Kısa kelimelerde masum mesajları da vurabilir.",
+};
+const ACTION_NAMES = { standard: "Standart ceza", delete: "Yalnızca sil", timeout: "Doğrudan timeout", ban: "Doğrudan ban" };
+const ACTION_HELP = {
+  standard: "Mesaj silinir. Kullanıcının toplam ihlali sayılır: belirlenen ihlale kadar yalnızca silinir, o ihlalde timeout, sonrasında ban atılır.",
+  delete: "Mesaj silinir, başka bir şey olmaz. Kullanıcının ihlal sayacına da yazılmaz.",
+  timeout: "Mesaj silinir ve kullanıcı ilk seferinde susturulur (timeout). Süreyi aşağıdan seçersin.",
+  ban: "Mesaj silinir ve kullanıcı ilk seferinde kalıcı olarak banlanır. Dikkatli kullan.",
+};
+function wordDialog(w) {
+  const dlg = h("dialog");
+  const draw = () => {
+    const minutes = h("input", { type: "number", min: 0, max: 10080, value: w.minutes, oninput: e => { w.minutes = Math.max(0, Math.trunc(Number(e.target.value)) || 0); markDirty(); } });
+    dlg.replaceChildren(
+      h("h2", null, `"${w.word}" ayarları`),
+      h("p", { class: "hint", style: "margin:0" }, "Hiçbir şeyi değiştirmezsen standart ayarlar geçerli kalır."),
+      h("div", { class: "field" }, h("b", null, "Nasıl aransın?"),
+        h("div", { class: "opts" }, Object.entries(MATCH_NAMES).map(([k, v]) => h("label", { class: w.match === k ? "on" : "" },
+          h("input", { type: "radio", name: "m", checked: w.match === k, onchange: () => { w.match = k; markDirty(); draw(); } }),
+          h("span", null, h("b", null, v), h("span", { class: "hint" }, MATCH_HELP[k])))))),
+      h("div", { class: "field" }, h("b", null, "Yakalanınca ne olsun?"),
+        h("div", { class: "opts" }, Object.entries(ACTION_NAMES).map(([k, v]) => h("label", { class: w.action === k ? "on" : "" },
+          h("input", { type: "radio", name: "a", checked: w.action === k, onchange: () => { w.action = k; if (k !== "timeout") w.minutes = 0; markDirty(); draw(); } }),
+          h("span", null, h("b", null, v), h("span", { class: "hint" }, ACTION_HELP[k])))))),
+      w.action === "timeout" && h("label", { class: "field" }, h("span", null, "Timeout süresi (dakika)"), minutes,
+        h("span", { class: "hint" }, `0 bırakırsan genel süre (${cfg.blacklist.timeout_minutes} dk) kullanılır. En fazla 10080.`)),
+      h("label", { class: "switch field" }, h("input", { type: "checkbox", checked: w.targeted, onchange: e => { w.targeted = e.target.checked; markDirty(); } }),
+        h("span", null, h("b", null, "Yalnızca birine yöneltilmişse yasak"),
+          h("span", { class: "hint" }, "Kelime tek başına serbest olur (\"amk yoruldum\"); birine söylenmişse (\"sen amk\") yapay zekâ ya da sen karar verirsin. Bu seçenekte yukarıdaki ceza seçimi kullanılmaz."))),
+      h("div", { class: "row", style: "justify-content:space-between;margin-top:18px" },
+        h("button", { class: "btn", onclick: () => { Object.assign(w, { match: "variants", targeted: false, action: "standard", minutes: 0 }); markDirty(); draw(); } }, "Standarda döndür"),
+        h("button", { class: "btn primary", onclick: () => { dlg.close(); } }, "Tamam")));
+  };
+  dlg.addEventListener("close", () => { dlg.remove(); render(); });
+  document.body.append(dlg); draw(); dlg.showModal();
+}
+
 // ---- kurulum yardımcıları
 const current = () => cfg.channels.find(c => c.slug.toLowerCase() === cfg.channel.toLowerCase());
 const ready = () => !!(current() && current().chatroom_id);
@@ -214,10 +272,10 @@ function roomHelper(c) {
 // ---- sayfalar
 const VIEWS = {
   kurulum() {
-    const id = h("input", { type: "text", placeholder: "Client ID", autocomplete: "off" });
-    const secret = h("input", { type: "password", placeholder: "Client Secret", autocomplete: "off" });
+    const id = h("input", { type: "text", placeholder: "Uygulama kimliği (Client ID)", autocomplete: "off" });
+    const secret = h("input", { type: "password", placeholder: "Gizli anahtar (Client Secret)", autocomplete: "off" });
     async function connect() {
-      if (!status.has_app && !(id.value.trim() && secret.value.trim())) return toast("Client ID ve Client Secret gerekli", true);
+      if (!status.has_app && !(id.value.trim() && secret.value.trim())) return toast("Uygulama kimliği ve gizli anahtar gerekli", true);
       try { location.href = (await api("/api/login", { client_id: id.value, client_secret: secret.value })).url; }
       catch (e) { toast(e.message, true); }
     }
@@ -231,13 +289,13 @@ const VIEWS = {
         !status.logged_in && h("ol", { class: "steps" },
           h("li", null, h("a", { class: "btn small", href: "https://kick.com/settings/developer", target: "_blank", rel: "noopener" }, "Kick geliştirici ayarlarını aç"),
             " ve yeni bir uygulama oluştur (adı önemli değil, \"bot\" yazabilirsin)"),
-          h("li", null, "\"Redirect URL\" kutusuna şunu yaz: ", h("code", null, status.redirect)),
-          h("li", null, "İzinlerden (scopes) şunları işaretle: ", status.scopes.split(" ").map(x => [h("code", null, x), " "])),
-          h("li", null, "Uygulamayı kaydet. Sana verilen ", h("b", null, "Client ID"), " ve ", h("b", null, "Client Secret"), " değerlerini aşağıya yapıştır")),
+          h("li", null, "\"Yönlendirme adresi (Redirect URL)\" kutusuna şunu yaz: ", h("code", null, status.redirect)),
+          h("li", null, "İzinlerden (scopes) yalnızca şunları işaretle: ", status.scopes.split(" ").map(x => [h("code", null, x), " "])),
+          h("li", null, "Uygulamayı kaydet. Sana verilen ", h("b", null, "Client ID (uygulama kimliği)"), " ve ", h("b", null, "Client Secret (gizli anahtar)"), " değerlerini aşağıya yapıştır")),
         h("div", { class: "row" }, h("div", { class: "grow" }, id), h("div", { class: "grow" }, secret),
           h("button", { class: "btn primary", onclick: connect }, status.logged_in ? "Yeniden bağlan" : "Kick'e bağlan")),
         h("p", { class: "hint" }, (status.has_app ? "Anahtar kayıtlı; kutuları boş bırakıp bağlanabilirsin. " : "")
-          + "Client Secret bir şifre gibidir: yalnızca bu bilgisayarda saklanır, kimseyle paylaşma.")),
+          + "Gizli anahtar (Client Secret) bir şifre gibidir: yalnızca bu bilgisayarda saklanır, kimseyle paylaşma.")),
       card("2. Chat odasını bağla",
         !ch ? h("p", { class: "hint", style: "margin:0" }, "Önce 1. adımı tamamla; kanalın otomatik eklenir.")
           : ch.chatroom_id ? h("p", { class: "done", style: "margin:0" }, `✓ ${ch.slug} kanalının chat odası bağlı`)
@@ -252,7 +310,7 @@ const VIEWS = {
   },
   genel() {
     const slug = h("input", { type: "text", placeholder: "kanal adı (ör. charasy)", onkeydown: e => e.key === "Enter" && addChannel() });
-    const badge = h("input", { type: "text", placeholder: "rozet türü (ör. og)" });
+    const badge = h("input", { type: "text", placeholder: "rozet adı (ör. Abone, OG, VIP)" });
     async function addChannel() {
       const s = slug.value.trim();
       if (!s) return toast("Kanal adı gerekli", true);
@@ -282,11 +340,11 @@ const VIEWS = {
       card("Etiket ve muafiyet",
         h("div", { class: "grid" }, text("nick", "İzlenen nick", "Chatte @nick yazılınca son mesajlar incelemeye düşer.")),
         h("p", { style: "font-weight:600;margin:14px 0 6px" }, "Muaf rozetler"),
-        h("div", { class: "chips" }, cfg.exempt_badges.map((b, i) => h("span", { class: "chip" }, b,
+        h("div", { class: "chips" }, cfg.exempt_badges.map((b, i) => h("span", { class: "chip" }, BADGE_NAMES[b] || b,
           h("button", { class: "x", onclick: () => { cfg.exempt_badges.splice(i, 1); markDirty(); render(); } }, "×")))),
         h("div", { class: "row", style: "margin-top:10px" }, h("div", { class: "grow" }, badge),
-          h("button", { class: "btn", onclick: () => { const v = badge.value.trim(); if (v) { cfg.exempt_badges.push(v); markDirty(); render(); } } }, "Rozet ekle")),
-        h("p", { class: "hint" }, "Bu rozetlere sahip kullanıcılara hiçbir kural uygulanmaz. Kick'teki türler: broadcaster, moderator, vip, og, subscriber, founder.")),
+          h("button", { class: "btn", onclick: () => { const t = badge.value.trim().toLowerCase(), v = Object.keys(BADGE_NAMES).find(k => k === t || BADGE_NAMES[k].toLowerCase() === t) || t; if (v && !cfg.exempt_badges.includes(v)) { cfg.exempt_badges.push(v); markDirty(); render(); } } }, "Rozet ekle")),
+        h("p", { class: "hint" }, "Bu rozetlere sahip kullanıcılara hiçbir kural uygulanmaz. Kick'teki rozetler: Yayıncı, Moderatör, VIP, OG, Abone, Kurucu.")),
       status.error && card("Son hata", h("div", { class: "hint" }, status.error)),
       card("Uygulama", h("div", { class: "row" },
         h("button", { class: "btn danger", onclick: async () => {
@@ -298,15 +356,15 @@ const VIEWS = {
     ];
   },
   kelime() {
-    const word = h("input", { type: "text", placeholder: "yeni kelime", onkeydown: e => e.key === "Enter" && add() });
-    const any = h("input", { type: "checkbox" });
-    const tgt = h("input", { type: "checkbox" });
+    const word = h("input", { type: "text", placeholder: "yeni kelime (ör. oç)", onkeydown: e => e.key === "Enter" && add() });
     const probe = h("input", { type: "text", placeholder: "bir mesaj yaz, yakalanıp yakalanmayacağını gör", onkeydown: e => e.key === "Enter" && run() });
     const result = h("div", { class: "result" });
+    const blank = () => ({ word: "", match: "variants", targeted: false, action: "standard", minutes: 0 });  // standart ayarlar
     function add() {
       const v = word.value.trim();
       if (!v) return;
-      cfg.blacklist.words.push({ word: v, anywhere: any.checked, targeted: tgt.checked });
+      if (cfg.blacklist.words.some(w => w.word.toLowerCase() === v.toLowerCase())) return toast(`"${v}" zaten listede`, true);
+      cfg.blacklist.words.push({ ...blank(), word: v });
       markDirty(); render();
     }
     async function run() {
@@ -314,34 +372,42 @@ const VIEWS = {
       try {
         const r = await api("/api/test", { text: probe.value });
         result.replaceChildren(
-          r.word ? h("div", { class: "hit" }, `Yasaklı kelime yakalandı: "${r.word}"`)
-            : r.targeted ? h("div", { class: "hit" }, `Hedefliyse yasak kelime yakalandı: "${r.targeted}" (kişiye yönelik mi, model ya da sen karar verirsin)`)
+          r.word ? h("div", { class: "hit" }, `Yasaklı kelime yakalandı: "${r.word}" → ${ACTION_NAMES[r.action]}`)
+            : r.targeted ? h("div", { class: "hit" }, `Hedefliyse yasak kelime yakalandı: "${r.targeted}" (kişiye yönelik mi, yapay zekâ ya da sen karar verirsin)`)
             : h("div", { class: "clean" }, "Yasaklı kelime yok"),
-          h("div", { class: r.caps ? "hit" : "clean" }, r.caps ? "Caps mesajı sayılır" : "Caps sayılmaz"));
+          h("div", { class: r.caps ? "hit" : "clean" }, r.caps ? "Büyük harf mesajı sayılır" : "Büyük harf mesajı sayılmaz"));
       } catch (e) { toast(e.message, true); }
     }
     const words = cfg.blacklist.words;
+    const summary = w => {
+      const parts = [ACTION_NAMES[w.action] + (w.action === "timeout" ? ` (${w.minutes || cfg.blacklist.timeout_minutes} dk)` : "")];
+      if (w.targeted) parts.push("yalnızca kişiye yönelikse");
+      return parts.join(" · ");
+    };
+    const risky = w => w.match === "anywhere" && w.action === "ban";
     return [
-      ...head("Yasaklı kelimeler", "Yakalanan mesaj silinir ve kullanıcının sayacı kalıcı olarak artar. Harf tekrarları ve büyük/küçük harf otomatik yakalanır."),
+      ...head("Yasaklı kelimeler", "Yakalanan mesaj silinir. Her kelime için nasıl aranacağını ve ne ceza verileceğini seçebilirsin; seçmezsen standart ayarlar geçerlidir."),
       card("Kelime listesi",
-        h("div", { class: "row" }, h("div", { class: "grow" }, word),
-          h("label", { class: "row", style: "gap:6px;cursor:pointer" }, any, "her yerde ara"),
-          h("label", { class: "row", style: "gap:6px;cursor:pointer" }, tgt, "yalnızca hedefliyse"), h("button", { class: "btn primary", onclick: add }, "Ekle")),
-        h("p", { class: "hint" }, "\"Tam kelime\" yalnızca kelimenin kendisini yakalar. \"Her yerde\" ekli halleri ve başka kelimenin içindekileri de yakalar; kısa kelimelerde masum mesajları da silebilir. Türü değiştirmek için etikete tıkla."),
-        h("p", { class: "hint" }, "\"Her zaman\" yasak kelime nerede geçerse geçsin silinir. \"Hedefliyse\" yasak kelime tek başına serbesttir (\"amk yoruldum\"); birine yöneltilmişse (\"sen ... amk\") model mesajı siler ve ceza kararı için İnceleme'ye düşürür. Model kapalıysa bu mesajlar ceza almadan İnceleme'ye düşer."),
-        words.length ? h("div", { class: "chips" }, words.map((w, i) => h("span", { class: "chip" }, w.word,
-          h("button", { class: "kind" + (w.anywhere ? " any" : ""), onclick: () => { w.anywhere = !w.anywhere; markDirty(); render(); } }, w.anywhere ? "her yerde" : "tam kelime"),
-          h("button", { class: "kind" + (w.targeted ? " any" : ""), onclick: () => { w.targeted = !w.targeted; markDirty(); render(); } }, w.targeted ? "hedefliyse" : "her zaman"),
-          h("button", { class: "x", onclick: () => { words.splice(i, 1); markDirty(); render(); } }, "×"))))
+        h("div", { class: "row" }, h("div", { class: "grow" }, word), h("button", { class: "btn primary", onclick: add }, "Ekle")),
+        h("p", { class: "hint" }, "Kelimeyi yazıp Ekle'ye basman yeterli: standart ayarla eklenir (türevleriyle yakala, standart ceza). Farklı bir ayar için kelimenin yanındaki ⋯ düğmesine bas."),
+        words.length ? h("div", { class: "words" }, words.map((w, i) => h("div", { class: "word" },
+          h("b", null, w.word),
+          h("select", { value: w.match, onchange: e => { w.match = e.target.value; markDirty(); render(); } },
+            Object.entries(MATCH_NAMES).map(([k, v]) => h("option", { value: k, selected: k === w.match }, v))),
+          h("button", { class: "btn small", title: "Bu kelimenin ayarları", onclick: () => wordDialog(w) }, "⋯"),
+          h("button", { class: "x", title: "Kelimeyi sil", onclick: () => { words.splice(i, 1); markDirty(); render(); } }, "×"),
+          h("span", { class: "sum" }, summary(w), risky(w) && h("b", null, " · dikkat: her yerde aranan kelimede kalıcı ban masum mesajları da vurabilir")))))
           : h("div", { class: "empty" }, "Henüz kelime eklenmedi.")),
-      card("Ceza", h("div", { class: "grid" },
-        num("blacklist.strikes_before_timeout", "Kaçıncı ihlalde timeout", "Öncesinde yalnızca mesaj silinir. Bir sonraki ihlalde kalıcı ban atılır."),
-        num("blacklist.timeout_minutes", "Timeout süresi (dk)", "En fazla 10080 (7 gün)."))),
+      card("Eşleşme türleri nedir?",
+        h("div", { class: "hint" }, Object.entries(MATCH_HELP).map(([k, v]) => h("p", { style: "margin:4px 0" }, h("b", null, MATCH_NAMES[k] + ": "), v)))),
+      card("Standart ceza", h("div", { class: "grid" },
+        num("blacklist.strikes_before_timeout", "Kaçıncı ihlalde timeout", "\"Standart\" cezalı kelimelerde: bu sayıya kadar yalnızca mesaj silinir, o ihlalde timeout atılır, sonrakinde kalıcı ban."),
+        num("blacklist.timeout_minutes", "Timeout süresi (dk)", "Süresi ayrıca belirlenmemiş kelimeler bunu kullanır. En fazla 10080 (7 gün)."))),
       card("Dene", h("div", { class: "row" }, h("div", { class: "grow" }, probe), h("button", { class: "btn", onclick: run }, "Dene")), result),
     ];
   },
   caps() {
-    return [...head("Caps", "Tamamı büyük harf olan mesajlar art arda gelirse timeout atılır. Araya normal bir mesaj girince sayaç sıfırlanır."),
+    return [...head("Büyük harf (caps)", "Tamamı büyük harf olan mesajlar art arda gelirse timeout atılır. Araya normal bir mesaj girince sayaç sıfırlanır."),
       card(null, h("div", { class: "grid" },
         num("caps.streak", "Art arda kaç caps mesajda", "Bu sayıya ulaşınca timeout atılır."),
         num("caps.min_letters", "En az harf sayısı", "Bundan kısa mesajlar caps sayılmaz (GG, XD gibi)."),
@@ -378,8 +444,8 @@ const VIEWS = {
         num("commands.cooldown_seconds", "Aynı komut için bekleme (sn)", "Bu süre içinde aynı komut tekrar yazılırsa bot cevap vermez; chat dolmasın diye.")))];
   },
   model() {
-    return [...head("Model", "Açıkken iki işe bakar: nick'in etiketlendiğinde son mesajları yorumlar ve \"hedefliyse yasak\" kelimelerin birine yöneltilip yöneltilmediğine karar verir. Kapalıyken ikisi de doğrudan İnceleme kuyruğuna düşer."),
-      card(null, toggle("llm.enabled", "Modeli kullan", "Bilgisayarın belleği doluyken model cevap veremeyebilir."),
+    return [...head("Yapay zekâ", "Açıkken iki işe bakar: nick'in etiketlendiğinde son mesajları yorumlar ve \"hedefliyse yasak\" kelimelerin birine yöneltilip yöneltilmediğine karar verir. Kapalıyken ikisi de doğrudan İnceleme kuyruğuna düşer."),
+      card(null, toggle("llm.enabled", "Yapay zekâyı kullan", "Bilgisayarın belleği doluyken model cevap veremeyebilir."),
         h("div", { style: "height:12px" }),
         toggle("llm.dry_run", "Kararları uygulama, yalnızca kaydet", "Açıkken model hiçbir şey silmez, kararları İnceleme kuyruğuna düşer. Kapalıyken model mesajı kendisi siler. Timeout ve ban kararı her durumda sende; model bunları atmaz.")),
       card("Ayarlar", h("div", { class: "grid" },
@@ -388,6 +454,21 @@ const VIEWS = {
       card("Kanal kuralları ve örnek kararlar",
         h("textarea", { style: "min-height:220px;font-family:ui-monospace,monospace;font-size:12px", value: get("llm.examples"), oninput: e => set("llm.examples", e.target.value) }),
         h("p", { class: "hint" }, "Bu metnin tamamı modele verilir."))];
+  },
+  kullanici() {
+    if (!users) { loadUsers(); return [...head("Kullanıcılar", "Yükleniyor…")]; }
+    const num = (v, flag) => h("td", { class: "n " + (v ? (flag ? "flag" : "") : "zero") }, v);
+    return [...head("Kullanıcılar", "Kural ihlali yapmış kullanıcılar ve bu kanalda aldıkları aksiyonlar. Veriler seçili kanala aittir."),
+      users.length ? card(null, h("table", { class: "usertable" },
+        h("thead", null, h("tr", null, h("th", null, "Kullanıcı"), h("th", { class: "n" }, "Silinen mesaj"), h("th", { class: "n" }, "Timeout"),
+          h("th", { class: "n" }, "Ban"), h("th", { class: "n" }, "Güncel ihlal sayacı"), h("th", null, "Son olay"), h("th", null, ""))),
+        h("tbody", null, users.map(u => h("tr", null, h("td", null, h("b", null, u.username)), num(u.deleted), num(u.timeouts, true), num(u.bans, true), num(u.strikes),
+          h("td", { class: "hint" }, new Date(u.last * 1000).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })),
+          h("td", null, u.strikes ? h("button", { class: "btn small", onclick: async () => {
+            if (!confirm(`${u.username} kullanıcısının ihlal sayacı sıfırlansın mı? (Geçmiş kayıtlar silinmez.)`)) return;
+            try { await api("/api/action", { action: "reset_user", user_id: u.user_id }); await loadUsers(); } catch (e) { toast(e.message, true); } } }, "Sayacı sıfırla") : null))))))
+        : h("div", { class: "empty" }, "Henüz kayıtlı bir ihlal yok."),
+      h("p", { class: "hint" }, "Silinen mesaj: yasaklı kelime nedeniyle ya da panelden silinenler. Güncel ihlal sayacı, \"Standart ceza\" kelimelerinde timeout ve ban sırasını belirler.")];
   },
   inceleme() {
     return [...head("İnceleme", "Botun aldığı aksiyonlar ve senin kararını bekleyen etiketler. Buradan mesaj silebilir, timeout ya da ban atabilir, cezayı kaldırabilirsin."),
@@ -454,7 +535,10 @@ function render() {
   $("main").replaceChildren(...VIEWS[page]().flat(3).filter(Boolean));
   markDirty();
 }
-function go(k) { page = k; location.hash = k; if (k === "inceleme") { itemsKey = ""; loadItems(); } else render(); }
+function go(k) { page = k; location.hash = k; if (k === "kullanici") users = null; if (k === "inceleme") { itemsKey = ""; loadItems(); } else render(); }
+async function loadUsers() {
+  try { users = await api("/api/users"); if (page === "kullanici") render(); } catch (e) { toast(e.message, true); }
+}
 async function loadItems() {
   try {
     const data = await api("/api/violations?status=" + filter), key = JSON.stringify(data);
@@ -487,7 +571,7 @@ window.addEventListener("beforeunload", e => { if (cfg && isDirty()) e.preventDe
   if (!cfg) return $("main").replaceChildren(h("div", { class: "empty" }, "Bota ulaşılamıyor. Uygulama açık mı? Kapalıysa yeniden çalıştır."));
   render();
   if (page === "inceleme") loadItems();
-  setInterval(() => { poll(); if (page === "inceleme") loadItems(); }, 5000);
+  setInterval(() => { poll(); if (page === "inceleme") loadItems(); if (page === "kullanici") loadUsers(); }, 5000);
 })();
 </script>
 </body>

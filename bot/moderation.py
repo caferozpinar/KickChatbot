@@ -6,8 +6,7 @@ from . import CFG, db, kick, llm, rules
 
 def blacklist(targeted=False):
     """targeted=False: her zaman yasak kelimeler. True: yalnızca birine yöneltilmişse yasak olanlar."""
-    return rules.load_blacklist(("*" if w["anywhere"] else "") + w["word"]
-                                for w in CFG["blacklist"]["words"] if w["targeted"] == targeted)
+    return [w for w in CFG["blacklist"]["words"] if w["targeted"] == targeted]
 
 
 _last = {}  # komut -> son cevaplanma zamanı
@@ -42,20 +41,25 @@ def handle(ev):
         return
     if not exempt:
         me = {"id": mid, "user_id": uid, "username": name, "content": text}
-        word = rules.blacklist_hit(text, *blacklist())
-        if word:
-            count = db.bump(uid, "blacklist")
-            action = rules.blacklist_action(count, CFG["blacklist"]["strikes_before_timeout"])
+        hit = rules.blacklist_hit(text, blacklist())
+        if hit:
+            entry, word = hit
+            # "Yalnızca sil" kelimeleri sayaca yazılmaz; diğerleri kullanıcının ihlal sayacını artırır.
+            count = 0 if entry["action"] == "delete" else db.bump(uid, "blacklist")
+            action = rules.blacklist_action(count, CFG["blacklist"]["strikes_before_timeout"], entry["action"])
             db.log(uid, name, "blacklist", count, action, word, [me])
             print(f"[yasaklı kelime] {name}: {text!r} -> '{word}' bulundu, ihlal #{count}, karar: {action}", flush=True)
             kick.delete(mid)
             if action == "timeout":
-                kick.timeout(uid, CFG["blacklist"]["timeout_minutes"], "Yasaklı kelime")
+                # Kelimeye özel süre yalnızca "doğrudan timeout" için geçerli; standart cezanın timeout'u genel süreyi kullanır.
+                minutes = entry["minutes"] if entry["action"] == "timeout" and entry["minutes"] else CFG["blacklist"]["timeout_minutes"]
+                kick.timeout(uid, minutes, "Yasaklı kelime")
             elif action == "ban":
-                kick.ban(uid, "Yasaklı kelime (tekrar)")
+                kick.ban(uid, "Yasaklı kelime")
             return
-        word = rules.blacklist_hit(text, *blacklist(targeted=True))
-        if word:  # kelime tek başına serbest; birine yöneltilmiş mi, model ya da sen karar verirsin
+        hit = rules.blacklist_hit(text, blacklist(targeted=True))
+        if hit:  # kelime tek başına serbest; birine yöneltilmiş mi, model ya da sen karar verirsin
+            word = hit[1]
             rows = db.recent(CFG["llm"]["context_messages"])
             if CFG["llm"]["enabled"]:
                 print(f"[hedefli kelime] {name}: {text!r} -> '{word}', model yorumluyor...", flush=True)

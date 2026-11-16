@@ -46,13 +46,15 @@ SHAPE = {
     "dry_run": True, "nick": "", "exempt_badges": [""],
     "channel": "",
     "channels": [{"slug": "", "chatroom_id": 1, "broadcaster_user_id": 1}],
-    "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "anywhere": False, "targeted": False}]},
+    "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "match": "", "targeted": False, "action": "", "minutes": 1}]},
     "caps": {"streak": 1, "min_letters": 1, "timeout_minutes": 1},
     "llm": {"enabled": False, "url": "", "model": "", "context_messages": 1,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 1, "repeat_min_minutes": 1, "repeat_max_minutes": 1, "messages": [""]},
     "commands": {"cooldown_seconds": 1, "items": [{"trigger": "", "response": ""}]},
 }
+_CHOICES = {"match": ("exact", "variants", "anywhere"),          # birebir / türevleriyle / her yerde
+            "action": ("standard", "delete", "timeout", "ban")}   # standart / yalnızca sil / doğrudan timeout / doğrudan ban
 _LIMITS = {"examples": 20000, "messages": 500, "url": 200, "response": 450, "trigger": 30}  # metin uzunluk sınırları (varsayılan 100)
 
 
@@ -69,6 +71,8 @@ def _check(value, ref, path, key=""):
         raise ValueError(f"{path}: türü yanlış")
     if isinstance(ref, str):
         value = value.strip()
+        if key in _CHOICES and value not in _CHOICES[key]:
+            raise ValueError(f"{path}: geçersiz seçenek")
         if len(value) > _LIMITS.get(key, 100) or (not value and key not in ("examples", "nick", "channel")):  # nick ve kanal kurulumda dolar
             raise ValueError(f"{path}: boş ya da çok uzun")
         if key == "trigger" and " " in value:
@@ -76,7 +80,8 @@ def _check(value, ref, path, key=""):
         if key == "slug" and not re.fullmatch(r"[A-Za-z0-9_-]{1,25}", value):  # dosya adında kullanılıyor
             raise ValueError(f"{path}: kanal adı yalnızca harf, rakam, _ ve - içerebilir")
     elif isinstance(ref, int) and not isinstance(ref, bool):
-        if value < (0 if key == "chatroom_id" else 1) or (key.endswith("_minutes") and value > 10080):  # chatroom_id 0: henüz bağlanmadı
+        # chatroom_id 0: henüz bağlanmadı. Kelimenin minutes değeri 0: genel timeout süresi kullanılır.
+        if value < (0 if key in ("chatroom_id", "minutes") else 1) or ("minutes" in key and value > 10080):
             raise ValueError(f"{path}: 1 ile {10080 if key.endswith('_minutes') else 'sonsuz'} arasında olmalı")
     return value
 
@@ -96,8 +101,17 @@ def validate(cfg):
     return cfg
 
 
-# Eski sürümün ayar dosyasında yeni eklenen bölümler yoktur; eksikleri varsayılanla tamamla.
-CFG = validate({**copy.deepcopy(DEFAULT), **(json.loads(CONFIG.read_text(encoding="utf-8")) if CONFIG.exists() else {})})
+def migrate(cfg):
+    """Eski sürümün ayar dosyasını bugünkü biçime getirir: eksik bölümler varsayılanla dolar, kelimeler yeni alanları alır."""
+    cfg = {**copy.deepcopy(DEFAULT), **cfg}
+    cfg["blacklist"]["words"] = [
+        {"word": w["word"], "match": w.get("match") or ("anywhere" if w.get("anywhere") else "variants"),
+         "targeted": w.get("targeted", False), "action": w.get("action", "standard"), "minutes": w.get("minutes", 0)}
+        for w in cfg["blacklist"]["words"]]
+    return cfg
+
+
+CFG = validate(migrate(json.loads(CONFIG.read_text(encoding="utf-8")) if CONFIG.exists() else {}))
 
 
 def save(cfg):

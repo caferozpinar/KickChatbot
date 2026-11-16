@@ -20,13 +20,15 @@ def violations(query):
 
 def test(body):
     text = str(body["text"])
-    return {"word": rules.blacklist_hit(text, *moderation.blacklist()),
-            "targeted": rules.blacklist_hit(text, *moderation.blacklist(targeted=True)),
+    hit, soft = rules.blacklist_hit(text, moderation.blacklist()), rules.blacklist_hit(text, moderation.blacklist(targeted=True))
+    return {"word": hit and hit[1], "action": hit and hit[0]["action"], "targeted": soft and soft[1],
             "caps": rules.is_caps(text, CFG["caps"]["min_letters"])}
 
 
 def action(body):
     """Bir kayıt üzerinden elle aksiyon. Hedef, o kaydın kanıtındaki bir mesaj ya da kullanıcı olmak zorunda."""
+    if body["action"] == "reset_user":  # Kullanıcılar sayfasından: kayıtla ilgisiz, yalnızca sayaç sıfırlama
+        return db.reset(int(body["user_id"]))
     v = db.violation(int(body["id"]))
     if v is None:
         raise ValueError("Kayıt bulunamadı")
@@ -49,6 +51,7 @@ def action(body):
             raise ValueError("Mesaj bu kayda ait değil")
         kick.delete(msg["id"])
         note = f"{msg['username']} mesajı silindi: {msg['content'][:80]}"
+        db.log(msg["user_id"], msg["username"], "panel", 0, "delete", "", [msg])  # elle alınan aksiyonlar da kullanıcı özetine girsin
     else:
         uid = body["user_id"]
         if uid not in users:
@@ -59,9 +62,11 @@ def action(body):
                 raise ValueError("Süre 1 ile 10080 dakika arasında olmalı")
             kick.timeout(uid, minutes, "Panel")
             note = f"{users[uid]}: {minutes} dk timeout"
+            db.log(uid, users[uid], "panel", 0, "timeout", f"{minutes} dk", [])
         elif act == "ban":
             kick.ban(uid, "Panel")
             note = f"{users[uid]}: kalıcı ban"
+            db.log(uid, users[uid], "panel", 0, "ban", "", [])
         elif act == "unban":
             kick.unban(uid)
             note = f"{users[uid]}: timeout/ban kaldırıldı"
@@ -130,6 +135,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif url.path == "/api/state":
             self._json(200, state())
+        elif url.path == "/api/users":
+            self._json(200, [dict(u) for u in db.users()])
         elif url.path == "/api/violations":
             self._json(200, violations(urllib.parse.parse_qs(url.query)))
         else:

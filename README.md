@@ -5,13 +5,16 @@ duyuru yazan sen görünürsün. Bot senin bilgisayarında çalışır, yönetim
 
 ## Ne yapar
 
-- **Yasaklı kelime:** mesajı siler; ayarladığın ihlalde timeout, sonrakinde ban atar. `şeftali` yazman yeterli:
+- **Yasaklı kelime:** mesajı siler. Her kelime için eşleşme türünü (birebir, türevleriyle, her yerde) ve cezayı
+  (standart, yalnızca sil, doğrudan timeout, doğrudan ban; kelimeye özel süreyle) ayrı seçebilirsin. Standart ceza
+  ayarladığın ihlalde timeout, sonrakinde ban atar. `şeftali` yazman yeterli:
   `seftali`, `ŞEFTAAALİ`, `ş e f t a l i`, `seftal1` de yakalanır.
 - **Hedefliyse yasak kelime:** kelime tek başına serbesttir, birine yöneltilmişse inceleme listesine düşer.
 - **Caps:** art arda tamamı büyük harf yazana timeout atar.
 - **Etiket:** biri seni `@nick` ile etiketlerse son mesajlar inceleme listesine düşer.
 - **Komutlar:** biri `!abone` gibi bir komut yazınca bot onu etiketleyerek ayarladığın cevabı yazar.
 - **Duyurular:** yalnızca yayın açıkken, rastgele sırayla, ayarladığın aralıklarla chate yazılır.
+- **Kullanıcılar:** kimin kaç mesajı silindi, kaç kez timeout ve ban aldı, güncel ihlal sayacı kaç.
 - **İnceleme:** botun yaptığı her şey kanıt mesajlarıyla kayıtlıdır; oradan mesaj silebilir, timeout ya da ban atabilir,
   cezayı kaldırabilirsin.
 - Moderatörler, VIP'ler ve yayın sahibi kurallardan muaftır.

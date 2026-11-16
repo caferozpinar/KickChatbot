@@ -1,5 +1,5 @@
 """Saf kural fonksiyonları: ağ ve veritabanı yok, hepsi test edilebilir."""
-import re
+import functools, re
 
 _EMOTE = re.compile(r"\[emote:\d+:[^\]]*\]")
 _MENTION = re.compile(r"@\w+")
@@ -12,9 +12,13 @@ _SPACED = re.compile(r"(?<=\b\w)[\W_]+(?=\w\b)")  # tek harflerin arasındaki ay
 _PLAIN = {"ş": "s", "ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ü": "u"}
 
 
+def _lower(text):
+    return text.replace("I", "ı").replace("İ", "i").lower()  # Türkçe küçük harf
+
+
 def normalize(text):
     """Kaçamak yazımları tek biçime indirir: 'Ş E F T A L 1', 'ŞEFTAAALİ' -> 'şeftali'."""
-    text = _EMOTE.sub(" ", text).replace("I", "ı").replace("İ", "i").lower().translate(_LEET)
+    text = _lower(_EMOTE.sub(" ", text)).translate(_LEET)
     return _REPEAT.sub(r"\1", _SPACED.sub("", text))
 
 
@@ -24,31 +28,32 @@ def _pattern(word):
     return "".join(f"[{c}{_PLAIN[c]}]" if c in _PLAIN else re.escape(c) for c in normalize(word))
 
 
-def load_blacklist(lines):
-    """(tam kelime desenleri, her yerde aranan desenler). '*' ile başlayan satır her yerde aranır."""
-    words, parts = [], []
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("*"):
-            if line[1:].strip():
-                parts.append(re.compile(_pattern(line[1:].strip())))
-        else:
-            words.append(re.compile(_pattern(line)))
-    return words, parts
+@functools.cache
+def _matcher(word, match):
+    """Bir mesajda kelimeyi arayan fonksiyon; bulursa bulduğu metni, bulamazsa None döndürür."""
+    if match == "exact":  # yazıldığı gibi: yalnızca büyük/küçük harf farkı yok sayılır ('oç' yasakken 'oc' ve 'oçç' serbest)
+        pattern = re.compile(r"(?<!\w)" + re.escape(_lower(word)) + r"(?!\w)")
+        return lambda text: (m := pattern.search(_lower(_EMOTE.sub(" ", text)))) and m.group()
+    pattern = re.compile(_pattern(word))
+    if match == "anywhere":  # başka kelimenin içinde de
+        return lambda text: (m := pattern.search(normalize(text))) and m.group()
+    return lambda text: next((t for t in _WORD.findall(normalize(text)) if pattern.fullmatch(t)), None)  # variants
 
 
-def blacklist_hit(text, words, parts):
-    norm = normalize(text)
-    for token in _WORD.findall(norm):
-        if any(w.fullmatch(token) for w in words):
-            return token
-    return next((m.group() for m in (p.search(norm) for p in parts) if m), None)
+_SEVERITY = {"delete": 0, "standard": 1, "timeout": 2, "ban": 3}
 
 
-def blacklist_action(count, strikes):
-    """count: bu kullanıcının toplam ihlali. Mesaj her durumda silinir."""
+def blacklist_hit(text, words):
+    """words: ayardaki kelime kayıtları. Mesajda geçen kayıtlardan cezası en ağır olanı ve bulunan metni döndürür:
+    (kayıt, metin) ya da None. Eşitlikte listede önce gelen seçilir."""
+    hits = [(w, found) for w in words if w["word"].strip() and (found := _matcher(w["word"].strip(), w["match"])(text))]
+    return max(hits, key=lambda h: _SEVERITY[h[0]["action"]], default=None)
+
+
+def blacklist_action(count, strikes, action="standard"):
+    """Mesaj her durumda silinir; dönen değer ek cezadır. 'standard' kullanıcının toplam ihlaline (count) göre tırmanır."""
+    if action != "standard":
+        return action
     return "delete" if count < strikes else "timeout" if count == strikes else "ban"
 
 

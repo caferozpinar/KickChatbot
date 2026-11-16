@@ -79,6 +79,16 @@ def examples():
     return _q("SELECT * FROM examples")
 
 
+def users():
+    """Kullanıcı başına özet: kaç mesajı silindi, kaç timeout ve ban yedi, güncel ihlal sayacı. En son olay başta."""
+    return _q("""
+        SELECT v.user_id, MAX(v.username) username, MAX(v.at) last,
+               SUM(v.action IN ('delete', 'sil') OR (v.rule = 'blacklist' AND v.action IN ('timeout', 'ban'))) deleted,
+               SUM(v.action = 'timeout') timeouts, SUM(v.action = 'ban') bans,
+               COALESCE((SELECT c.count FROM counters c WHERE c.user_id = v.user_id AND c.rule = 'blacklist'), 0) strikes
+        FROM violations v GROUP BY v.user_id ORDER BY last DESC LIMIT 500""")
+
+
 def violations(n, status=None):
     """En yeniden eskiye."""
     if status:
