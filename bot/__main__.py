@@ -1,7 +1,15 @@
 """kick-bot [run | log | listen]"""
-import json, sys, threading, time, traceback, webbrowser
+import json, os, sys, threading, time, traceback, webbrowser
 
 from . import CFG, DATA, STATE, channel, db, kick
+
+
+def open_panel(url):
+    if getattr(sys, "frozen", False) and "LD_LIBRARY_PATH" in os.environ:
+        # Paketlenmiş uygulama kendi kütüphane klasörünü ortama yazar; tarayıcıyı açan sistem komutları
+        # (xdg-open, /bin/sh) bu kütüphanelerle çalışamaz. Alt süreçler için eski değere dön.
+        os.environ["LD_LIBRARY_PATH"] = os.environ.get("LD_LIBRARY_PATH_ORIG", "")
+    webbrowser.open(url)
 
 
 def room():
@@ -38,7 +46,7 @@ def main():
         try:
             server = panel.server()
         except OSError:  # zaten çalışıyor: ikinci kez açan kullanıcıya paneli göster
-            webbrowser.open(url)
+            open_panel(url)
             return
         if getattr(sys, "frozen", False):  # paketlenmiş uygulamada terminal yok; çıktılar dosyaya gider
             sys.stdout = sys.stderr = open(DATA / "bot.log", "a", encoding="utf-8", buffering=1)
@@ -48,7 +56,7 @@ def main():
         threading.Thread(target=chat_loop, daemon=True).start()
         print(f"Bot çalışıyor. Panel: {url}", flush=True)
         if "--no-browser" not in sys.argv:
-            webbrowser.open(url)
+            open_panel(url)
         server.serve_forever()
     else:
         sys.exit(__doc__)
