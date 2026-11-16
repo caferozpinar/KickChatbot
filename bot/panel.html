@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kick-bot paneli</title>
+<style>
+:root {
+  --bg: #0b0e0f; --panel: #14181a; --raised: #1b2023; --line: #262d31; --text: #e8ecee; --muted: #8b979d;
+  --accent: #53fc18; --accent-ink: #062100; --danger: #ff5f5f; --warn: #ffb84d; --radius: 10px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
+button, input, textarea, select { font: inherit; color: inherit; }
+input[type=radio], input[type=checkbox] { accent-color: var(--accent); }
+header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 20px; background: rgba(11,14,15,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+.brand b { color: var(--accent); }
+.spacer { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; font-size: 12px;
+  background: var(--raised); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.pill.ok { color: var(--text); } .pill.ok::before { background: var(--accent); }
+.pill.bad { color: var(--text); } .pill.bad::before { background: var(--danger); }
+.pill.warn { color: var(--text); } .pill.warn::before { background: var(--warn); }
+.layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; }
+nav { position: sticky; top: 58px; align-self: start; padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+nav button { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; border: 0;
+  background: none; padding: 9px 12px; border-radius: 8px; color: var(--muted); cursor: pointer; }
+nav button:hover { background: var(--panel); color: var(--text); }
+nav button.on { background: var(--panel); color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
+.count { background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 11px; padding: 1px 7px; border-radius: 99px; }
+main { padding: 22px 20px 110px; min-width: 0; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.lead { color: var(--muted); margin: 0 0 18px; max-width: 70ch; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+.card h2 { font-size: 14px; margin: 0 0 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+label.field { display: flex; flex-direction: column; gap: 5px; }
+label.field > span:first-child { font-weight: 600; font-size: 13px; }
+.hint { color: var(--muted); font-size: 12px; }
+input[type=text], input[type=password], input[type=number], textarea, select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; width: 100%; outline: none; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+textarea { resize: vertical; min-height: 64px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > .grow { flex: 1; min-width: 160px; }
+.btn { border: 1px solid var(--line); background: var(--raised); padding: 7px 13px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.btn.danger { color: var(--danger); } .btn.danger:hover { border-color: var(--danger); }
+.btn.small { padding: 3px 9px; font-size: 12px; }
+.switch { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.switch input { appearance: none; flex: none; width: 40px; height: 22px; border-radius: 99px; background: var(--line); position: relative;
+  cursor: pointer; transition: background .15s; margin: 2px 0 0; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--text); transition: transform .15s; }
+.switch input:checked { background: var(--accent); } .switch input:checked::after { transform: translateX(18px); background: var(--accent-ink); }
+.switch b { display: block; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; background: var(--raised); border: 1px solid var(--line);
+  border-radius: 99px; padding: 4px 6px 4px 12px; }
+.chip .kind { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; cursor: pointer; background: none; }
+.chip .kind.any { color: var(--warn); border-color: var(--warn); }
+.x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+.x:hover { color: var(--danger); }
+.empty { color: var(--muted); padding: 26px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.tabs button { border: 1px solid var(--line); background: none; color: var(--muted); padding: 6px 14px; border-radius: 99px; cursor: pointer; }
+.tabs button.on { color: var(--text); border-color: var(--accent); }
+.item-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--raised); border: 1px solid var(--line); text-transform: uppercase; letter-spacing: .4px; }
+.tag.open { color: var(--warn); border-color: var(--warn); }
+.who { font-weight: 700; }
+.when { color: var(--muted); font-size: 12px; margin-left: auto; }
+.msgs { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.msg { display: flex; gap: 10px; align-items: baseline; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.msg .u { color: var(--accent); font-weight: 600; flex: none; }
+.msg .t { flex: 1; overflow-wrap: anywhere; }
+.users { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.users input[type=number] { width: 76px; padding: 3px 8px; }
+.notes { margin: 10px 0 0; padding: 8px 10px; background: var(--bg); border-left: 3px solid var(--accent); border-radius: 4px;
+  font-size: 12px; color: var(--muted); white-space: pre-wrap; }
+.savebar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: none; align-items: center; gap: 14px;
+  background: var(--raised); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 14px 10px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 9; }
+.savebar.show { display: flex; }
+.toast { position: fixed; right: 20px; top: 70px; background: var(--raised); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  padding: 10px 14px; border-radius: 8px; max-width: 420px; z-index: 10; overflow-wrap: anywhere; }
+.toast.err { border-left-color: var(--danger); }
+.result { margin-top: 10px; font-size: 13px; }
+.steps { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.steps code, .copy { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.done { color: var(--accent); font-weight: 700; }
+a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+#power { min-width: 92px; font-weight: 700; }
+#power.on { color: var(--danger); } #power.off { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.result .hit { color: var(--danger); font-weight: 600; } .result .clean { color: var(--accent); }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; }
+  nav { position: static; flex-direction: row; overflow-x: auto; padding: 10px 14px 0; }
+  nav button { white-space: nowrap; } nav button.on { box-shadow: inset 0 -3px 0 var(--accent); }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">kick<b>-bot</b></div>
+  <select id="channel" title="Botun çalıştığı kanal" style="width:auto"></select>
+  <div class="spacer"></div>
+  <div id="pills" class="row"></div>
+  <button class="btn" id="power"></button>
+</header>
+<div class="layout">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+<div class="savebar" id="savebar"><span>Kaydedilmemiş değişiklik var</span>
+  <button class="btn" id="discard">Vazgeç</button><button class="btn primary" id="save">Kaydet</button></div>
+<script>
+"use strict";
+// Chat mesajları güvenilmeyen içeriktir: sayfaya yalnızca metin düğümü olarak eklenir, asla HTML olarak değil.
+const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Caps"], ["duyuru", "Duyurular"], ["model", "Model"], ["inceleme", "İnceleme"]];
+const RULES = { blacklist: "Yasaklı kelime", caps: "Caps", etiket: "Etiket", llm: "Model", hedefli: "Hedefli kelime" };
+const ACTIONS = { delete: "mesaj silindi", timeout: "timeout atıldı", ban: "banlandı", inceleme: "inceleme bekliyor", sil: "model sildi", serbest: "model serbest bıraktı" };
+let cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
+
+const $ = id => document.getElementById(id);
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "class") e.className = v;
+    else if (k === "value") e.value = v;
+    else if (k === "checked") e.checked = v;
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat(3)) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return e;
+}
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || ("Hata " + r.status));
+  return j;
+}
+function toast(text, err) {
+  document.querySelectorAll(".toast").forEach(t => t.remove());
+  const t = h("div", { class: "toast" + (err ? " err" : "") }, text);
+  document.body.append(t);
+  setTimeout(() => t.remove(), err ? 7000 : 3000);
+}
+const get = path => path.split(".").reduce((o, k) => o[k], cfg);
+function set(path, value) {
+  const keys = path.split("."), last = keys.pop();
+  keys.reduce((o, k) => o[k], cfg)[last] = value;
+  markDirty();
+}
+const isDirty = () => JSON.stringify(cfg) !== saved;
+function markDirty() { $("savebar").classList.toggle("show", isDirty()); }
+
+// ---- alan yardımcıları
+function num(path, label, hint) {
+  return h("label", { class: "field" }, h("span", null, label),
+    h("input", { type: "number", min: 1, value: get(path), oninput: e => set(path, Math.trunc(Number(e.target.value)) || 0) }),
+    hint && h("span", { class: "hint" }, hint));
+}
+function text(path, label, hint) {
+  return h("label", { class: "field" }, h("span", null, label),
+    h("input", { type: "text", value: get(path), oninput: e => set(path, e.target.value) }), hint && h("span", { class: "hint" }, hint));
+}
+function toggle(path, label, hint) {
+  return h("label", { class: "switch" }, h("input", { type: "checkbox", checked: get(path), onchange: e => set(path, e.target.checked) }),
+    h("span", null, h("b", null, label), hint && h("span", { class: "hint" }, hint)));
+}
+const card = (title, ...kids) => h("section", { class: "card" }, title && h("h2", null, title), ...kids);
+const head = (title, lead) => [h("h1", null, title), h("p", { class: "lead" }, lead)];
+
+// ---- kurulum yardımcıları
+const current = () => cfg.channels.find(c => c.slug.toLowerCase() === cfg.channel.toLowerCase());
+const ready = () => !!(current() && current().chatroom_id);
+async function saveCfg(message) {
+  try {
+    await api("/api/config", cfg);
+    saved = ""; cfg = null; await poll(); render(); itemsKey = ""; if (page === "inceleme") await loadItems();
+    toast(message || "Kaydedildi, bot yeni ayarlarla çalışıyor");
+  } catch (e) { toast(e.message, true); }
+}
+// Chat odası numarasını Kick yalnızca kendi sitesinde veriyor: kullanıcı sayfayı kendi tarayıcısında açıp yapıştırır.
+function roomHelper(c) {
+  const box = h("textarea", { placeholder: "Açılan sayfadaki yazının tamamını buraya yapıştır (Ctrl+V)", oninput: e => {
+    const t = e.target.value, m = /"chatroom"\s*:\s*\{[^{}]*?"id"\s*:\s*(\d+)/.exec(t), plain = /^\s*(\d{3,})\s*$/.exec(t);
+    if (!t.trim()) return;
+    if (m && !t.toLowerCase().includes(`"slug":"${c.slug.toLowerCase()}"`)) return toast(`Yapıştırdığın sayfa ${c.slug} kanalına ait değil`, true);
+    if (!m && !plain) return toast("Bu yazıda chat odası bulunamadı. Sayfanın tamamını kopyaladığından emin ol (Ctrl+A, sonra Ctrl+C).", true);
+    c.chatroom_id = Number((m || plain)[1]);
+    saveCfg(`${c.slug} kanalının chat odası bağlandı`);
+  } });
+  return h("div", null,
+    h("ol", { class: "steps" },
+      h("li", null, h("a", { class: "btn small", href: "https://kick.com/api/v2/channels/" + encodeURIComponent(c.slug), target: "_blank", rel: "noopener" }, "Kick sayfasını aç"),
+        " (yeni sekmede karışık bir yazı açılır, normaldir)"),
+      h("li", null, "O sekmede ", h("code", null, "Ctrl+A"), " ile hepsini seç, ", h("code", null, "Ctrl+C"), " ile kopyala"),
+      h("li", null, "Bu sayfaya dön ve aşağıdaki kutuya ", h("code", null, "Ctrl+V"), " ile yapıştır")),
+    box);
+}
+
+// ---- sayfalar
+const VIEWS = {
+  kurulum() {
+    const id = h("input", { type: "text", placeholder: "Client ID", autocomplete: "off" });
+    const secret = h("input", { type: "password", placeholder: "Client Secret", autocomplete: "off" });
+    async function connect() {
+      if (!status.has_app && !(id.value.trim() && secret.value.trim())) return toast("Client ID ve Client Secret gerekli", true);
+      try { location.href = (await api("/api/login", { client_id: id.value, client_secret: secret.value })).url; }
+      catch (e) { toast(e.message, true); }
+    }
+    const ch = current();
+    return [
+      ...head("Kurulum", "Botu ilk kez kullanıyorsan bu üç adımı sırayla tamamla. Bir kez yapılır."),
+      card("1. Kick hesabını bağla",
+        status.logged_in && h("p", { class: "done" }, `✓ Kick hesabı bağlı${cfg.nick ? " (" + cfg.nick + ")" : ""}`),
+        h("p", { class: "hint", style: "margin-top:0" }, status.logged_in ? "Yeniden bağlanmak gerekirse aşağıdan tekrar bağlanabilirsin."
+          : "Bot senin hesabınla çalışır. Bunun için Kick'te kendine ait küçük bir \"uygulama\" açman gerekiyor; ücretsiz ve 5 dakika sürer."),
+        !status.logged_in && h("ol", { class: "steps" },
+          h("li", null, h("a", { class: "btn small", href: "https://kick.com/settings/developer", target: "_blank", rel: "noopener" }, "Kick geliştirici ayarlarını aç"),
+            " ve yeni bir uygulama oluştur (adı önemli değil, \"bot\" yazabilirsin)"),
+          h("li", null, "\"Redirect URL\" kutusuna şunu yaz: ", h("code", null, status.redirect)),
+          h("li", null, "İzinlerden (scopes) şunları işaretle: ", status.scopes.split(" ").map(x => [h("code", null, x), " "])),
+          h("li", null, "Uygulamayı kaydet. Sana verilen ", h("b", null, "Client ID"), " ve ", h("b", null, "Client Secret"), " değerlerini aşağıya yapıştır")),
+        h("div", { class: "row" }, h("div", { class: "grow" }, id), h("div", { class: "grow" }, secret),
+          h("button", { class: "btn primary", onclick: connect }, status.logged_in ? "Yeniden bağlan" : "Kick'e bağlan")),
+        h("p", { class: "hint" }, (status.has_app ? "Anahtar kayıtlı; kutuları boş bırakıp bağlanabilirsin. " : "")
+          + "Client Secret bir şifre gibidir: yalnızca bu bilgisayarda saklanır, kimseyle paylaşma.")),
+      card("2. Chat odasını bağla",
+        !ch ? h("p", { class: "hint", style: "margin:0" }, "Önce 1. adımı tamamla; kanalın otomatik eklenir.")
+          : ch.chatroom_id ? h("p", { class: "done", style: "margin:0" }, `✓ ${ch.slug} kanalının chat odası bağlı`)
+          : [h("p", { class: "hint", style: "margin-top:0" }, `Botun ${ch.slug} kanalının chatini okuyabilmesi için bir kez şunu yap:`), roomHelper(ch)]),
+      card("3. Başlat",
+        h("p", { class: "hint", style: "margin-top:0" }, "Bot \"Yazdırma modu\"nda başlar: hiçbir mesajı silmez, kimseyi susturmaz, yalnızca ne yapacağını kaydeder. "
+          + "Yasaklı kelimelerini ekleyip sonuçları İnceleme sayfasında gördükten sonra Genel sayfasından Yazdırma modunu kapatırsın."),
+        h("div", { class: "row" },
+          h("button", { class: "btn primary", disabled: !ready() || status.running, onclick: () => power(true) }, status.running ? "✓ Bot çalışıyor" : "Botu başlat"),
+          h("button", { class: "btn", onclick: () => go("kelime") }, "Yasaklı kelimeleri ekle"))),
+    ];
+  },
+  genel() {
+    const slug = h("input", { type: "text", placeholder: "kanal adı (ör. charasy)", onkeydown: e => e.key === "Enter" && addChannel() });
+    const badge = h("input", { type: "text", placeholder: "rozet türü (ör. og)" });
+    async function addChannel() {
+      const s = slug.value.trim();
+      if (!s) return toast("Kanal adı gerekli", true);
+      try {
+        const { broadcaster_user_id } = await api("/api/resolve", { slug: s });
+        cfg.channels.push({ slug: s, chatroom_id: 0, broadcaster_user_id });
+        if (!cfg.channel) cfg.channel = s;
+        await saveCfg(`${s} eklendi; şimdi chat odasını bağla`);
+      } catch (e) { toast(e.message, true); }
+    }
+    return [
+      ...head("Genel", "Botun durumu, çalıştığı kanal ve kimlerin kurallardan muaf olduğu."),
+      card("Çalışma modu",
+        toggle("dry_run", "Yazdırma modu", "Açıkken bot hiçbir mesajı silmez, kimseyi susturmaz; yalnızca ne yapacağını kaydeder. Kayıtlar ayrı bir deneme defterine gider.")),
+      card("Kanallar",
+        h("p", { class: "hint", style: "margin-top:-6px" }, "Bot aynı anda tek kanalda çalışır. Başka bir kanalda kullanmak için o kanalda moderatör olmalısın."),
+        h("div", { class: "msgs" }, cfg.channels.map((c, i) => h("label", { class: "msg", style: "cursor:pointer;align-items:center" },
+          h("input", { type: "radio", name: "ch", checked: c.slug.toLowerCase() === cfg.channel.toLowerCase(), onchange: () => { set("channel", c.slug); render(); } }),
+          h("span", { class: "u" }, c.slug), h("span", { class: "t hint" }, c.chatroom_id ? "chat odası bağlı" : "chat odası bağlı değil"),
+          cfg.channels.length > 1 && c.slug.toLowerCase() !== cfg.channel.toLowerCase() &&
+            h("button", { class: "x", title: "Kaldır", onclick: e => { e.preventDefault(); cfg.channels.splice(i, 1); markDirty(); render(); } }, "×")))),
+        h("div", { class: "row" }, h("div", { class: "grow" }, slug), h("button", { class: "btn", onclick: addChannel }, "Kanal ekle")),
+        cfg.channels.filter(c => !c.chatroom_id).map(c => h("div", { style: "margin-top:14px" },
+          h("p", { class: "hint" }, `${c.slug} kanalının chat odası henüz bağlı değil:`), roomHelper(c)))),
+      card("Etiket ve muafiyet",
+        h("div", { class: "grid" }, text("nick", "İzlenen nick", "Chatte @nick yazılınca son mesajlar incelemeye düşer.")),
+        h("p", { style: "font-weight:600;margin:14px 0 6px" }, "Muaf rozetler"),
+        h("div", { class: "chips" }, cfg.exempt_badges.map((b, i) => h("span", { class: "chip" }, b,
+          h("button", { class: "x", onclick: () => { cfg.exempt_badges.splice(i, 1); markDirty(); render(); } }, "×")))),
+        h("div", { class: "row", style: "margin-top:10px" }, h("div", { class: "grow" }, badge),
+          h("button", { class: "btn", onclick: () => { const v = badge.value.trim(); if (v) { cfg.exempt_badges.push(v); markDirty(); render(); } } }, "Rozet ekle")),
+        h("p", { class: "hint" }, "Bu rozetlere sahip kullanıcılara hiçbir kural uygulanmaz. Kick'teki türler: broadcaster, moderator, vip, og, subscriber, founder.")),
+      status.error && card("Son hata", h("div", { class: "hint" }, status.error)),
+      card("Uygulama", h("div", { class: "row" },
+        h("button", { class: "btn danger", onclick: async () => {
+          if (!confirm("Bot tamamen kapatılsın mı? Yeniden açmak için uygulamayı tekrar çalıştırman gerekir.")) return;
+          try { await api("/api/quit", {}); } catch (e) {}
+          document.body.replaceChildren(h("div", { class: "empty", style: "margin:60px auto;max-width:420px" }, "Bot kapatıldı. Bu sekmeyi kapatabilirsin."));
+        } }, "Uygulamayı kapat"),
+        h("span", { class: "hint" }, "Bot arka planda çalışır; bu sekmeyi kapatmak botu durdurmaz."))),
+    ];
+  },
+  kelime() {
+    const word = h("input", { type: "text", placeholder: "yeni kelime", onkeydown: e => e.key === "Enter" && add() });
+    const any = h("input", { type: "checkbox" });
+    const tgt = h("input", { type: "checkbox" });
+    const probe = h("input", { type: "text", placeholder: "bir mesaj yaz, yakalanıp yakalanmayacağını gör", onkeydown: e => e.key === "Enter" && run() });
+    const result = h("div", { class: "result" });
+    function add() {
+      const v = word.value.trim();
+      if (!v) return;
+      cfg.blacklist.words.push({ word: v, anywhere: any.checked, targeted: tgt.checked });
+      markDirty(); render();
+    }
+    async function run() {
+      if (isDirty()) return toast("Önce değişiklikleri kaydet; deneme kayıtlı ayarlarla yapılır", true);
+      try {
+        const r = await api("/api/test", { text: probe.value });
+        result.replaceChildren(
+          r.word ? h("div", { class: "hit" }, `Yasaklı kelime yakalandı: "${r.word}"`)
+            : r.targeted ? h("div", { class: "hit" }, `Hedefliyse yasak kelime yakalandı: "${r.targeted}" (kişiye yönelik mi, model ya da sen karar verirsin)`)
+            : h("div", { class: "clean" }, "Yasaklı kelime yok"),
+          h("div", { class: r.caps ? "hit" : "clean" }, r.caps ? "Caps mesajı sayılır" : "Caps sayılmaz"));
+      } catch (e) { toast(e.message, true); }
+    }
+    const words = cfg.blacklist.words;
+    return [
+      ...head("Yasaklı kelimeler", "Yakalanan mesaj silinir ve kullanıcının sayacı kalıcı olarak artar. Harf tekrarları ve büyük/küçük harf otomatik yakalanır."),
+      card("Kelime listesi",
+        h("div", { class: "row" }, h("div", { class: "grow" }, word),
+          h("label", { class: "row", style: "gap:6px;cursor:pointer" }, any, "her yerde ara"),
+          h("label", { class: "row", style: "gap:6px;cursor:pointer" }, tgt, "yalnızca hedefliyse"), h("button", { class: "btn primary", onclick: add }, "Ekle")),
+        h("p", { class: "hint" }, "\"Tam kelime\" yalnızca kelimenin kendisini yakalar. \"Her yerde\" ekli halleri ve başka kelimenin içindekileri de yakalar; kısa kelimelerde masum mesajları da silebilir. Türü değiştirmek için etikete tıkla."),
+        h("p", { class: "hint" }, "\"Her zaman\" yasak kelime nerede geçerse geçsin silinir. \"Hedefliyse\" yasak kelime tek başına serbesttir (\"amk yoruldum\"); birine yöneltilmişse (\"sen ... amk\") model mesajı siler ve ceza kararı için İnceleme'ye düşürür. Model kapalıysa bu mesajlar ceza almadan İnceleme'ye düşer."),
+        words.length ? h("div", { class: "chips" }, words.map((w, i) => h("span", { class: "chip" }, w.word,
+          h("button", { class: "kind" + (w.anywhere ? " any" : ""), onclick: () => { w.anywhere = !w.anywhere; markDirty(); render(); } }, w.anywhere ? "her yerde" : "tam kelime"),
+          h("button", { class: "kind" + (w.targeted ? " any" : ""), onclick: () => { w.targeted = !w.targeted; markDirty(); render(); } }, w.targeted ? "hedefliyse" : "her zaman"),
+          h("button", { class: "x", onclick: () => { words.splice(i, 1); markDirty(); render(); } }, "×"))))
+          : h("div", { class: "empty" }, "Henüz kelime eklenmedi.")),
+      card("Ceza", h("div", { class: "grid" },
+        num("blacklist.strikes_before_timeout", "Kaçıncı ihlalde timeout", "Öncesinde yalnızca mesaj silinir. Bir sonraki ihlalde kalıcı ban atılır."),
+        num("blacklist.timeout_minutes", "Timeout süresi (dk)", "En fazla 10080 (7 gün)."))),
+      card("Dene", h("div", { class: "row" }, h("div", { class: "grow" }, probe), h("button", { class: "btn", onclick: run }, "Dene")), result),
+    ];
+  },
+  caps() {
+    return [...head("Caps", "Tamamı büyük harf olan mesajlar art arda gelirse timeout atılır. Araya normal bir mesaj girince sayaç sıfırlanır."),
+      card(null, h("div", { class: "grid" },
+        num("caps.streak", "Art arda kaç caps mesajda", "Bu sayıya ulaşınca timeout atılır."),
+        num("caps.min_letters", "En az harf sayısı", "Bundan kısa mesajlar caps sayılmaz (GG, XD gibi)."),
+        num("caps.timeout_minutes", "Timeout süresi (dk)")))];
+  },
+  duyuru() {
+    const list = cfg.announcements.messages;
+    return [...head("Duyurular", "Yalnızca yayın açıkken, rastgele sırayla chate yazılır."),
+      card("Mesajlar",
+        list.length ? list.map((m, i) => {
+          const counter = h("span", { class: "hint" }, `${m.length}/500`);
+          return h("div", { class: "row", style: "margin-bottom:8px;align-items:flex-start" },
+            h("div", { class: "grow" }, h("textarea", { maxlength: 500, value: m, oninput: e => { list[i] = e.target.value; counter.textContent = `${e.target.value.length}/500`; markDirty(); } }), counter),
+            h("button", { class: "x", title: "Sil", onclick: () => { list.splice(i, 1); markDirty(); render(); } }, "×"));
+        }) : h("div", { class: "empty", style: "margin-bottom:10px" }, "Duyuru yok; bot chate bir şey yazmaz."),
+        h("button", { class: "btn", onclick: () => { list.push("Yeni duyuru"); markDirty(); render(); } }, "Duyuru ekle")),
+      card("Zamanlama", h("div", { class: "grid" },
+        num("announcements.gap_minutes", "İki duyuru arası (dk)"),
+        num("announcements.repeat_min_minutes", "Aynı duyuru en erken (dk)", "Bu süre dolmadan aynı duyuru tekrar atılmaz."),
+        num("announcements.repeat_max_minutes", "Aynı duyuru en geç (dk)", "Bu süre dolunca o duyuru öne alınır.")))];
+  },
+  model() {
+    return [...head("Model", "Açıkken iki işe bakar: nick'in etiketlendiğinde son mesajları yorumlar ve \"hedefliyse yasak\" kelimelerin birine yöneltilip yöneltilmediğine karar verir. Kapalıyken ikisi de doğrudan İnceleme kuyruğuna düşer."),
+      card(null, toggle("llm.enabled", "Modeli kullan", "Bilgisayarın belleği doluyken model cevap veremeyebilir."),
+        h("div", { style: "height:12px" }),
+        toggle("llm.dry_run", "Kararları uygulama, yalnızca kaydet", "Açıkken model hiçbir şey silmez, kararları İnceleme kuyruğuna düşer. Kapalıyken model mesajı kendisi siler. Timeout ve ban kararı her durumda sende; model bunları atmaz.")),
+      card("Ayarlar", h("div", { class: "grid" },
+        text("llm.url", "Ollama adresi"), text("llm.model", "Model adı"),
+        num("llm.context_messages", "İncelenen son mesaj sayısı", "Model kapalıyken de inceleme kaydına bu kadar mesaj eklenir."))),
+      card("Kanal kuralları ve örnek kararlar",
+        h("textarea", { style: "min-height:220px;font-family:ui-monospace,monospace;font-size:12px", value: get("llm.examples"), oninput: e => set("llm.examples", e.target.value) }),
+        h("p", { class: "hint" }, "Bu metnin tamamı modele verilir."))];
+  },
+  inceleme() {
+    return [...head("İnceleme", "Botun aldığı aksiyonlar ve senin kararını bekleyen etiketler. Buradan mesaj silebilir, timeout ya da ban atabilir, cezayı kaldırabilirsin."),
+      h("div", { class: "tabs" }, [["open", `İncelenecek${openCount ? " (" + openCount + ")" : ""}`], ["all", "Tüm kayıtlar"]].map(([k, l]) =>
+        h("button", { class: filter === k ? "on" : "", onclick: () => { filter = k; itemsKey = ""; loadItems(); } }, l))),
+      items.length ? items.map(itemCard) : h("div", { class: "empty" }, filter === "open" ? "İncelenecek bir şey yok." : "Henüz kayıt yok.")];
+  },
+};
+
+function itemCard(v) {
+  const users = new Map([[v.user_id, v.username]]);
+  v.evidence.forEach(m => users.set(m.user_id, m.username));
+  const act = async (body, sure) => {
+    if (sure && !confirm(sure)) return;
+    try {
+      await api("/api/action", { id: v.id, ...body });
+      toast(cfg.dry_run && !["close", "reopen", "reset", "teach"].includes(body.action) ? "Yazdırma modu açık: aksiyon uygulanmadı, yalnızca kaydedildi" : "Tamam");
+      itemsKey = ""; await loadItems(); await poll();
+    } catch (e) { toast(e.message, true); }
+  };
+  const note = h("input", { type: "text", maxlength: 200, placeholder: "istersen sebebini yaz (ör. isim + senin = kişiye yönelik)" });
+  const teach = label => act({ action: "teach", label, note: note.value });
+  return h("section", { class: "card" },
+    h("div", { class: "item-head" },
+      h("span", { class: "tag" + (v.status === "open" ? " open" : "") }, RULES[v.rule] || v.rule),
+      h("span", { class: "who" }, v.username),
+      h("span", { class: "hint" }, [v.count ? `ihlal #${v.count}` : null, ACTIONS[v.action] || v.action, v.detail].filter(Boolean).join(" · ")),
+      h("span", { class: "when" }, new Date(v.at * 1000).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))),
+    h("div", { class: "msgs" }, v.evidence.map(m => h("div", { class: "msg" }, h("span", { class: "u" }, m.username), h("span", { class: "t" }, m.content),
+      h("button", { class: "btn small danger", onclick: () => act({ action: "delete", message_id: m.id }) }, "Mesajı sil")))),
+    h("div", { class: "users" }, [...users].map(([uid, name]) => {
+      const minutes = h("input", { type: "number", min: 1, max: 10080, value: 10, title: "dakika" });
+      return h("div", { class: "row" }, h("span", { class: "who", style: "min-width:120px" }, name),
+        minutes, h("button", { class: "btn small", onclick: () => act({ action: "timeout", user_id: uid, minutes: Math.trunc(Number(minutes.value)) }) }, "dk timeout"),
+        h("button", { class: "btn small danger", onclick: () => act({ action: "ban", user_id: uid }, `${name} kalıcı olarak banlansın mı?`) }, "Banla"),
+        h("button", { class: "btn small", onclick: () => act({ action: "unban", user_id: uid }) }, "Cezayı kaldır"),
+        h("button", { class: "btn small", onclick: () => act({ action: "reset", user_id: uid }, `${name} kullanıcısının ihlal sayaçları sıfırlansın mı?`) }, "Sayaçları sıfırla"));
+    })),
+    v.rule === "hedefli" && h("div", { class: "row", style: "margin-top:12px" }, h("span", { class: "hint" }, "Modele öğret:"), h("div", { class: "grow" }, note),
+      h("button", { class: "btn small danger", onclick: () => teach("kisi") }, "Kişiye yönelik"),
+      h("button", { class: "btn small", onclick: () => teach("serbest") }, "Kişiye yönelik değil")),
+    v.notes && h("div", { class: "notes" }, v.notes.trim()),
+    h("div", { class: "row", style: "margin-top:12px;justify-content:flex-end" },
+      v.status === "open" ? h("button", { class: "btn primary", onclick: () => act({ action: "close" }) }, "İncelendi, kapat")
+        : h("button", { class: "btn", onclick: () => act({ action: "reopen" }) }, "Yeniden aç")));
+}
+
+// ---- çizim ve veri
+function render() {
+  $("nav").replaceChildren(...PAGES.map(([k, l]) => h("button", { class: page === k ? "on" : "", onclick: () => go(k) }, l,
+    k === "inceleme" && openCount ? h("span", { class: "count" }, openCount) : null)));
+  $("channel").replaceChildren(...cfg.channels.map(c => h("option", { value: c.slug }, c.slug)));
+  $("channel").hidden = !cfg.channels.length;
+  if (current()) $("channel").value = current().slug;
+  $("power").textContent = status.running ? "Durdur" : "Başlat";
+  $("power").className = "btn " + (status.running ? "on" : "off");
+  $("pills").replaceChildren(
+    h("span", { class: "pill " + (status.running ? "ok" : "warn") }, status.running ? "Çalışıyor" : "Durduruldu"),
+    h("span", { class: "pill " + (status.chat ? "ok" : "bad") }, status.chat ? "Chat bağlı" : "Chat bağlı değil"),
+    h("span", { class: "pill " + (status.logged_in ? "ok" : "bad") }, status.logged_in ? "Kick girişi var" : "Kick girişi yok"),
+    h("span", { class: "pill " + (status.live ? "ok" : "") }, status.live == null ? "Yayın: bilinmiyor" : status.live ? "Yayın açık" : "Yayın kapalı"),
+    h("span", { class: "pill " + (JSON.parse(saved).dry_run ? "warn" : "ok") }, JSON.parse(saved).dry_run ? "Yazdırma modu" : "Gerçek mod"));
+  if (!VIEWS[page]) page = ready() && status.logged_in ? "genel" : "kurulum";  // kurulum bitmediyse oradan başla
+  $("main").replaceChildren(...VIEWS[page]().flat(3).filter(Boolean));
+  markDirty();
+}
+function go(k) { page = k; location.hash = k; if (k === "inceleme") { itemsKey = ""; loadItems(); } else render(); }
+async function loadItems() {
+  try {
+    const data = await api("/api/violations?status=" + filter), key = JSON.stringify(data);
+    if (key === itemsKey) return;   // değişmediyse yeniden çizme: yazılan süre ve odak kaybolmasın
+    items = data; itemsKey = key;
+    if (page === "inceleme") render();
+  } catch (e) { toast(e.message, true); }
+}
+async function poll() {
+  try {
+    const s = await api("/api/state"), incoming = JSON.stringify(s.config);
+    const changed = JSON.stringify(s.status) !== JSON.stringify(status) || s.open !== openCount || (!cfg || (!isDirty() && incoming !== saved));
+    status = s.status; openCount = s.open;
+    if (!cfg || (!isDirty() && incoming !== saved)) { cfg = s.config; saved = incoming; }
+    // Ayar sayfasında yazarken yeniden çizme; yalnızca üst bilgi değiştiyse ve odak bir alanda değilse çiz.
+    if (changed && !(document.activeElement && ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName))) render();
+  } catch (e) { status = { ...status, chat: false }; }
+}
+$("save").onclick = () => saveCfg();
+async function power(on) {
+  try { await api("/api/run", { on }); await poll(); render(); toast(on ? "Bot başlatıldı" : "Bot durduruldu"); }
+  catch (e) { toast(e.message, true); if (!ready()) go("kurulum"); }
+}
+$("power").onclick = () => power(!status.running);
+$("discard").onclick = () => { cfg = JSON.parse(saved); render(); };
+$("channel").onchange = e => { set("channel", e.target.value); render(); };
+window.addEventListener("beforeunload", e => { if (cfg && isDirty()) e.preventDefault(); });
+(async () => {
+  await poll();
+  if (!cfg) return $("main").replaceChildren(h("div", { class: "empty" }, "Bota ulaşılamıyor. Uygulama açık mı? Kapalıysa yeniden çalıştır."));
+  render();
+  if (page === "inceleme") loadItems();
+  setInterval(() => { poll(); if (page === "inceleme") loadItems(); }, 5000);
+})();
+</script>
+</body>
+</html>

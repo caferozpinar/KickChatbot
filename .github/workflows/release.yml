@@ -1,0 +1,32 @@
+# "v1.0.0" gibi bir etiket gönderilince Windows ve Linux uygulamasını derleyip Releases sayfasına koyar.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            file: kick-bot.exe
+          - os: ubuntu-22.04  # eski bir sürümde derlenen dosya yeni dağıtımlarda da çalışır
+            file: kick-bot-linux
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: 1  # testler Türkçe karakter yazdırıyor; Windows'un varsayılan kodlaması bunu kaldırmaz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pyinstaller -r requirements.txt
+      - run: python -m unittest discover tests
+      - run: pyinstaller --onefile --noconsole --name kick-bot --add-data "bot/panel.html:bot" run.py
+      - if: runner.os == 'Linux'
+        run: mv dist/kick-bot dist/kick-bot-linux
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.file }}

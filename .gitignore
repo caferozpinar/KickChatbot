@@ -1,0 +1,13 @@
+# kişisel veriler: ayar, Kick anahtarı, giriş bilgisi, kayıtlar
+config.json
+secrets.toml
+secrets.json
+tokens.json
+emotes.json
+bot*.db*
+*.log
+# derleme
+__pycache__/
+build/
+dist/
+*.spec
