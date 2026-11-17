@@ -9,6 +9,11 @@ duyuru yazan sen görünürsün. Bot senin bilgisayarında çalışır, yönetim
   (standart, yalnızca sil, doğrudan timeout, doğrudan ban; kelimeye özel süreyle) ayrı seçebilirsin. Standart ceza
   ayarladığın ihlalde timeout, sonrakinde ban atar. `şeftali` yazman yeterli:
   `seftali`, `ŞEFTAAALİ`, `ş e f t a l i`, `seftal1` de yakalanır.
+- **Serbest kelimeler:** `oc` yasakken `ooc` gibi yazıldığı gibi serbest bıraktığın kelimeler yakalanmaz.
+- **Sayaç azalması:** ihlal sayacı her kullanıcıda 30 dakikada (ayarlanır) 1 azalır.
+- **Geçici moderatörler:** yazdığın kişiler bir mesajı `!sil`, `!to` gibi komutla cevaplayınca bot o işlemi yapar ve
+  "kim istedi" diye kaydeder.
+- **Başka moderatörler:** onların sildiği mesajlar ihlal sayacına eklenir, timeout ve ban'leri kayda geçer.
 - **Hedefliyse yasak kelime:** kelime tek başına serbesttir, birine yöneltilmişse inceleme listesine düşer.
 - **Caps:** art arda tamamı büyük harf yazana timeout atar.
 - **Etiket:** biri seni `@nick` ile etiketlerse son mesajlar inceleme listesine düşer.

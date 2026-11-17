@@ -137,8 +137,8 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
 <script>
 "use strict";
 // Chat mesajları güvenilmeyen içeriktir: sayfaya yalnızca metin düğümü olarak eklenir, asla HTML olarak değil.
-const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Büyük harf"], ["kullanici", "Kullanıcılar"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["model", "Yapay zekâ"], ["inceleme", "İnceleme"]];
-const RULES = { blacklist: "Yasaklı kelime", caps: "Büyük harf", etiket: "Etiket", llm: "Yapay zekâ", hedefli: "Hedefli kelime", panel: "Elle" };
+const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Büyük harf"], ["kullanici", "Kullanıcılar"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["yardimci", "Geçici moderatörler"], ["model", "Yapay zekâ"], ["inceleme", "İnceleme"]];
+const RULES = { blacklist: "Yasaklı kelime", caps: "Büyük harf", etiket: "Etiket", llm: "Yapay zekâ", hedefli: "Hedefli kelime", panel: "Elle", mod: "Başka moderatör", yardimci: "Geçici moderatör" };
 const ACTIONS = { delete: "mesaj silindi", timeout: "susturuldu (timeout)", ban: "banlandı", inceleme: "inceleme bekliyor", sil: "model sildi", serbest: "model serbest bıraktı" };
 let users = null, cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
 
@@ -384,6 +384,7 @@ const VIEWS = {
       if (w.targeted) parts.push("yalnızca kişiye yönelikse");
       return parts.join(" · ");
     };
+    const allowed = cfg.blacklist.allowed;
     const risky = w => w.match === "anywhere" && w.action === "ban";
     return [
       ...head("Yasaklı kelimeler", "Yakalanan mesaj silinir. Her kelime için nasıl aranacağını ve ne ceza verileceğini seçebilirsin; seçmezsen standart ayarlar geçerlidir."),
@@ -398,11 +399,19 @@ const VIEWS = {
           h("button", { class: "x", title: "Kelimeyi sil", onclick: () => { words.splice(i, 1); markDirty(); render(); } }, "×"),
           h("span", { class: "sum" }, summary(w), risky(w) && h("b", null, " · dikkat: her yerde aranan kelimede kalıcı ban masum mesajları da vurabilir")))))
           : h("div", { class: "empty" }, "Henüz kelime eklenmedi.")),
+      card("Serbest kelimeler",
+        h("p", { class: "hint", style: "margin-top:0" }, "Bu kelimeler mesajda aynen (yazıldığı gibi) geçerse yasak aramasından önce çıkarılır, mesaj silinmez. Örnek: \"oc\" yasak, \"ooc\" ve \"occ\" serbest. Harf sıkıştırma uygulanmaz: \"ooc\" yazılırsa serbest, \"oooc\" yazılırsa yine yakalanır. Ekli hâli (\"ooclar\") ayrı yazılmalı."),
+        allowed.length ? allowed.map((a, i) => h("div", { class: "row", style: "margin-bottom:8px" },
+          h("input", { type: "text", maxlength: 100, value: a, oninput: e => { allowed[i] = e.target.value.trim(); markDirty(); } }),
+          h("button", { class: "x", title: "Sil", onclick: () => { allowed.splice(i, 1); markDirty(); render(); } }, "×")))
+          : h("div", { class: "empty", style: "margin-bottom:10px" }, "Serbest kelime yok."),
+        h("button", { class: "btn", onclick: () => { allowed.push("kelime"); markDirty(); render(); } }, "Serbest kelime ekle")),
       card("Eşleşme türleri nedir?",
         h("div", { class: "hint" }, Object.entries(MATCH_HELP).map(([k, v]) => h("p", { style: "margin:4px 0" }, h("b", null, MATCH_NAMES[k] + ": "), v)))),
       card("Standart ceza", h("div", { class: "grid" },
         num("blacklist.strikes_before_timeout", "Kaçıncı ihlalde timeout", "\"Standart\" cezalı kelimelerde: bu sayıya kadar yalnızca mesaj silinir, o ihlalde timeout atılır, sonrakinde kalıcı ban."),
-        num("blacklist.timeout_minutes", "Timeout süresi (dk)", "Süresi ayrıca belirlenmemiş kelimeler bunu kullanır. En fazla 10080 (7 gün)."))),
+        num("blacklist.timeout_minutes", "Timeout süresi (dk)", "Süresi ayrıca belirlenmemiş kelimeler bunu kullanır. En fazla 10080 (7 gün)."),
+        num("blacklist.decay_minutes", "Sayaç azalma süresi (dk)", "Her kullanıcının ihlal sayacı bu sürede 1 azalır; temiz kalan kişi zamanla sıfırlanır."))),
       card("Dene", h("div", { class: "row" }, h("div", { class: "grow" }, probe), h("button", { class: "btn", onclick: run }, "Dene")), result),
     ];
   },
@@ -442,6 +451,26 @@ const VIEWS = {
         h("p", { class: "hint" }, "Komut tek kelime olmalı; mesajın neresinde geçerse geçsin çalışır (\"bana !abone linki ver\"). Büyük/küçük harf fark etmez. Bir mesajda birden fazla komut varsa listede önce gelen cevaplanır. Komutlar yayın kapalıyken de çalışır ve herkes kullanabilir.")),
       card("Bekleme", h("div", { class: "grid" },
         num("commands.cooldown_seconds", "Aynı komut için bekleme (sn)", "Bu süre içinde aynı komut tekrar yazılırsa bot cevap vermez; chat dolmasın diye.")))];
+  },
+  yardimci() {
+    const hp = cfg.helpers, DO = { delete: "Mesajı sil", timeout: "Sustur (timeout)", ban: "Banla" };
+    return [...head("Geçici moderatörler", "Buraya yazdığın kişiler, bir mesajı komutla cevaplayınca bot o işlemi senin yerine yapar. Örnek: ahmet birinin mesajına \"!to\" diye cevap yazarsa o kişi susturulur. Her işlem İnceleme → Tüm kayıtlar'da \"ahmet istedi\" diye kaydedilir."),
+      card("Kişiler",
+        hp.nicks.length ? hp.nicks.map((n, i) => h("div", { class: "row", style: "margin-bottom:8px" },
+          h("input", { type: "text", maxlength: 50, placeholder: "kullanıcı adı", value: n, oninput: e => { hp.nicks[i] = e.target.value.trim(); markDirty(); } }),
+          h("button", { class: "x", title: "Sil", onclick: () => { hp.nicks.splice(i, 1); markDirty(); render(); } }, "×")))
+          : h("div", { class: "empty", style: "margin-bottom:10px" }, "Kimseye yetki verilmedi."),
+        h("button", { class: "btn", onclick: () => { hp.nicks.push("kullanıcı"); markDirty(); render(); } }, "Kişi ekle"),
+        h("p", { class: "hint" }, "Yetki, sen listeden silene kadar sürer. Yayıncıya, muaf rozetli kişilere ve listedeki diğer kişilere işlem yapılamaz.")),
+      card("Komutlar",
+        hp.commands.map((c, i) => h("div", { class: "row", style: "margin-bottom:8px" },
+          h("input", { type: "text", style: "width:120px", maxlength: 30, placeholder: "!komut", value: c.trigger, oninput: e => { c.trigger = e.target.value.trim(); markDirty(); } }),
+          h("select", { onchange: e => { c.do = e.target.value; markDirty(); render(); } }, ...Object.entries(DO).map(([k, t]) => h("option", { value: k, selected: c.do === k }, t))),
+          c.do === "timeout" && h("input", { type: "number", style: "width:80px", min: 1, value: c.minutes || 5, oninput: e => { c.minutes = +e.target.value; markDirty(); } }),
+          c.do === "timeout" && h("span", { class: "hint" }, "dk"),
+          h("button", { class: "x", title: "Sil", onclick: () => { hp.commands.splice(i, 1); markDirty(); render(); } }, "×"))),
+        h("button", { class: "btn", onclick: () => { hp.commands.push({ trigger: "!komut", do: "delete", minutes: 0 }); markDirty(); render(); } }, "Komut ekle"),
+        h("p", { class: "hint" }, "Komut, cevap mesajının ilk kelimesi olmalı. Mesaj her durumda silinir; \"Sustur\" ve \"Banla\" ek olarak kişiyi cezalandırır. Banı da süreli susturma yapmak istersen komutu \"Sustur\" seç."))];
   },
   model() {
     return [...head("Yapay zekâ", "Açıkken iki işe bakar: nick'in etiketlendiğinde son mesajları yorumlar ve \"hedefliyse yasak\" kelimelerin birine yöneltilip yöneltilmediğine karar verir. Kapalıyken ikisi de doğrudan İnceleme kuyruğuna düşer."),

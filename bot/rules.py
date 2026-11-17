@@ -43,9 +43,12 @@ def _matcher(word, match):
 _SEVERITY = {"delete": 0, "standard": 1, "timeout": 2, "ban": 3}
 
 
-def blacklist_hit(text, words):
+def blacklist_hit(text, words, allowed=()):
     """words: ayardaki kelime kayıtları. Mesajda geçen kayıtlardan cezası en ağır olanı ve bulunan metni döndürür:
-    (kayıt, metin) ya da None. Eşitlikte listede önce gelen seçilir."""
+    (kayıt, metin) ya da None. Eşitlikte listede önce gelen seçilir.
+    allowed: serbest kelimeler; mesajda yazıldığı gibi (harf sıkıştırmadan) geçiyorsa aramadan önce metinden çıkarılır."""
+    ok = {_lower(a.strip()) for a in allowed}
+    text = re.sub(r"\w+", lambda m: " " if _lower(m.group()) in ok else m.group(), text) if ok else text
     hits = [(w, found) for w in words if w["word"].strip() and (found := _matcher(w["word"].strip(), w["match"])(text))]
     return max(hits, key=lambda h: _SEVERITY[h[0]["action"]], default=None)
 

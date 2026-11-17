@@ -20,7 +20,7 @@ def violations(query):
 
 def test(body):
     text = str(body["text"])
-    hit, soft = rules.blacklist_hit(text, moderation.blacklist()), rules.blacklist_hit(text, moderation.blacklist(targeted=True))
+    hit, soft = rules.blacklist_hit(text, moderation.blacklist(), CFG["blacklist"]["allowed"]), rules.blacklist_hit(text, moderation.blacklist(targeted=True), CFG["blacklist"]["allowed"])
     return {"word": hit and hit[1], "action": hit and hit[0]["action"], "targeted": soft and soft[1],
             "caps": rules.is_caps(text, CFG["caps"]["min_letters"])}
 

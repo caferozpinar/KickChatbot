@@ -22,7 +22,10 @@ def chat_loop():
     from . import listener, moderation
     for m in listener.messages(room):
         try:
-            moderation.handle(moderation.from_websocket(m, channel()["broadcaster_user_id"]))
+            if "_event" in m:
+                moderation.mod_event(m)
+            else:
+                moderation.handle(moderation.from_websocket(m, channel()["broadcaster_user_id"]))
         except Exception as e:  # tek bir mesajdaki hata botu düşürmesin
             STATE["error"] = f"{time.strftime('%H:%M')} aksiyon: {e}"
             traceback.print_exc()

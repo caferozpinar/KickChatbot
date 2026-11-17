@@ -11,7 +11,7 @@ llm_real = llm  # Handle testlerinde "llm" parametresi sahte modüldür
 TEST_CFG = {
     "dry_run": True, "nick": "Charasy", "exempt_badges": ["broadcaster", "moderator", "vip"],
     "channel": "test", "channels": [{"slug": "test", "chatroom_id": 1, "broadcaster_user_id": 1}],
-    "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [
+    "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "decay_minutes": 30, "allowed": ["ooc"], "words": [
         {"word": "yarrak", "match": "variants", "targeted": False, "action": "standard", "minutes": 0},
         {"word": "amk", "match": "variants", "targeted": True, "action": "standard", "minutes": 0}]},
     "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5},
@@ -19,6 +19,7 @@ TEST_CFG = {
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": ["a"]},
     "commands": {"cooldown_seconds": 10, "items": [{"trigger": "!abone", "response": "abone olmak için link"}]},
+    "helpers": {"nicks": ["ali"], "commands": [{"trigger": "!sil", "do": "delete", "minutes": 0}, {"trigger": "!to", "do": "timeout", "minutes": 7}]},
 }
 
 
@@ -62,6 +63,14 @@ class Rules(unittest.TestCase):
             self.assertEqual(self.hit(hit, "oç", "exact").lower(), "oç", hit)
         for clean in ("oc", "o ç", "0ç", "oçç", "oçlar", "koç", "[emote:1:oç]"):  # birebir: türev, uzatma, ek yok
             self.assertIsNone(self.hit(clean, "oç", "exact"), clean)
+
+    def test_allowed(self):
+        w = [{"word": "oc", "match": "variants", "action": "standard"}]
+        hit = lambda t: rules.blacklist_hit(t, w, ["OOC", "occ"])
+        for clean in ("ooc", "OOC", "occ", "sen ooc sen"):
+            self.assertIsNone(hit(clean), clean)
+        for caught in ("oc", "oooc", "ooc oc", "o c"):  # serbest kelime başkasını açmaz
+            self.assertTrue(hit(caught), caught)
 
     def test_blacklist_action(self):
         self.assertEqual([rules.blacklist_action(n, 3) for n in (1, 2, 3, 4, 5)],
@@ -171,6 +180,51 @@ class Handle(unittest.TestCase):
         self.assertEqual((by[3]["deleted"], by[3]["strikes"]), (2, 0))
         self.assertEqual((by[4]["timeouts"], by[4]["strikes"]), (1, 1))
         self.assertEqual((by[5]["bans"], by[5]["deleted"]), (1, 1))
+
+    def test_helper(self, llm, kick):
+        def reply(text, who="ali", target=9, badges=()):
+            ev = event(text, uid=20)
+            ev["sender"]["username"] = who
+            ev["reply_to"] = {"id": "orig", "user_id": target, "username": f"u{target}"}
+            moderation.handle(ev)
+        moderation.handle(event("selam", uid=9, mid="orig"))
+        reply("!to bence yeter")                       # geçici moderatör: mesaj silinir, 7 dk timeout
+        kick.delete.assert_called_with("orig")
+        kick.timeout.assert_called_once_with(9, 7, "ali istedi")
+        self.assertEqual(db.violations(9)[0]["detail"], "ali istedi: !to")
+        kick.delete.reset_mock()
+        reply("!sil", who="veli")                      # listede olmayan kişi: hiçbir şey olmaz
+        reply("sil", who="ali")                        # komut değil
+        kick.delete.assert_not_called()
+        reply("!sil", target=1)                        # yayıncı korunur
+        kick.delete.assert_not_called()
+        ev = event("!sil", uid=20); ev["sender"]["username"] = "ali"   # cevap değil: işlem yok
+        moderation.handle(ev)
+        kick.delete.assert_not_called()
+
+    def test_decay(self, llm, kick):
+        for _ in range(3):
+            db.bump(4, "blacklist")
+        with mock.patch("bot.db.time.time", return_value=__import__("time").time() + 65 * 60):  # 2 aralık geçti
+            self.assertEqual(db.bump(4, "blacklist"), 2)   # 3 - 2 + 1
+        with mock.patch("bot.db.time.time", return_value=__import__("time").time() + 10 * 3600):
+            db.decay()
+        self.assertEqual(db.bump(4, "blacklist"), 1)
+
+    def test_mod_events(self, llm, kick):
+        kick.MINE = set()
+        for i in range(4):
+            moderation.handle(event("selam", uid=9, mid=f"x{i}"))
+        for i in range(4):
+            moderation.mod_event({"_event": "deleted", "message": {"id": f"x{i}"}})
+        self.assertEqual((kick.timeout.call_count, kick.ban.call_count), (1, 1))  # 3. ihlalde timeout, 4.'de ban
+        kick.MINE = {("msg", "z")}
+        moderation.handle(event("selam", uid=8, mid="z"))
+        moderation.mod_event({"_event": "deleted", "message": {"id": "z"}})   # botun kendi silmesi sayılmaz
+        moderation.mod_event({"_event": "deleted", "message": {"id": "yok"}})  # tanımadığımız mesaj
+        self.assertEqual([v for v in db.violations(50) if v["user_id"] == 8], [])
+        moderation.mod_event({"_event": "banned", "user": {"id": 5, "username": "k"}, "banned_by": {"username": "ali"}, "permanent": True})
+        self.assertEqual(db.violations(1)[0]["detail"], "ali attı")
 
     def test_migrate(self, llm, kick):
         old = {"blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [

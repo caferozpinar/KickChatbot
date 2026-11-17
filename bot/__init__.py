@@ -33,12 +33,13 @@ STATE = {"chat": False, "live": None, "error": "", "running": False}  # panelde 
 DEFAULT = {
     "dry_run": True, "nick": "", "exempt_badges": ["broadcaster", "moderator", "vip"],
     "channel": "", "channels": [],
-    "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": []},
+    "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [], "allowed": [], "decay_minutes": 30},
     "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5},
     "llm": {"enabled": False, "url": "http://localhost:11434", "model": "gemma4:e2b", "context_messages": 5,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": []},
     "commands": {"cooldown_seconds": 10, "items": []},
+    "helpers": {"nicks": [], "commands": [{"trigger": "!sil", "do": "delete", "minutes": 0}, {"trigger": "!to", "do": "timeout", "minutes": 5}]},
 }
 
 # Ayar dosyasının biçimi. Listelerdeki tek eleman, liste elemanlarının şablonudur.
@@ -46,15 +47,17 @@ SHAPE = {
     "dry_run": True, "nick": "", "exempt_badges": [""],
     "channel": "",
     "channels": [{"slug": "", "chatroom_id": 1, "broadcaster_user_id": 1}],
-    "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "match": "", "targeted": False, "action": "", "minutes": 1}]},
+    "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "match": "", "targeted": False, "action": "", "minutes": 1}], "allowed": [""], "decay_minutes": 1},
     "caps": {"streak": 1, "min_letters": 1, "timeout_minutes": 1},
     "llm": {"enabled": False, "url": "", "model": "", "context_messages": 1,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 1, "repeat_min_minutes": 1, "repeat_max_minutes": 1, "messages": [""]},
     "commands": {"cooldown_seconds": 1, "items": [{"trigger": "", "response": ""}]},
+    "helpers": {"nicks": [""], "commands": [{"trigger": "", "do": "", "minutes": 1}]},
 }
 _CHOICES = {"match": ("exact", "variants", "anywhere"),          # birebir / türevleriyle / her yerde
-            "action": ("standard", "delete", "timeout", "ban")}   # standart / yalnızca sil / doğrudan timeout / doğrudan ban
+            "action": ("standard", "delete", "timeout", "ban"),
+            "do": ("delete", "timeout", "ban")}  # geçici moderatör komutunun işlemi   # standart / yalnızca sil / doğrudan timeout / doğrudan ban
 _LIMITS = {"examples": 20000, "messages": 500, "url": 200, "response": 450, "trigger": 30}  # metin uzunluk sınırları (varsayılan 100)
 
 
@@ -104,6 +107,7 @@ def validate(cfg):
 def migrate(cfg):
     """Eski sürümün ayar dosyasını bugünkü biçime getirir: eksik bölümler varsayılanla dolar, kelimeler yeni alanları alır."""
     cfg = {**copy.deepcopy(DEFAULT), **cfg}
+    cfg["blacklist"] = {**DEFAULT["blacklist"], **cfg["blacklist"]}  # eski dosyada "allowed" yok
     cfg["blacklist"]["words"] = [
         {"word": w["word"], "match": w.get("match") or ("anywhere" if w.get("anywhere") else "variants"),
          "targeted": w.get("targeted", False), "action": w.get("action", "standard"), "minutes": w.get("minutes", 0)}

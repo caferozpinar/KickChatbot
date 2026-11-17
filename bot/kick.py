@@ -163,15 +163,20 @@ def send(text, reply_to=None):
     api("POST", "/chat", body)
 
 
+MINE = set()  # botun kendi sildiği mesajlar ve banladığı kullanıcılar: dinleyici bunları başkasının işi sanmasın
+
+
 def delete(message_id):
     if _dry(f"mesaj silinir (id {message_id})"):
         return
+    MINE.add(("msg", str(message_id)))
     api("DELETE", "/chat/" + urllib.parse.quote(message_id, safe=""))
 
 
 def timeout(user_id, minutes, reason):
     if _dry(f"{minutes} dk timeout atılır (kullanıcı {user_id}, sebep: {reason})"):
         return
+    MINE.add(("user", user_id))
     api("POST", "/moderation/bans", {
         "broadcaster_user_id": _bid(), "user_id": user_id, "duration": minutes, "reason": reason[:100]})
 
@@ -179,6 +184,7 @@ def timeout(user_id, minutes, reason):
 def ban(user_id, reason):
     if _dry(f"kalıcı ban atılır (kullanıcı {user_id}, sebep: {reason})"):
         return
+    MINE.add(("user", user_id))
     api("POST", "/moderation/bans", {"broadcaster_user_id": _bid(), "user_id": user_id, "reason": reason[:100]})
 
 

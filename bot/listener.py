@@ -24,6 +24,16 @@ def chat_message(frame):
     return json.loads(data["data"]) if data.get("event") == "App\\Events\\ChatMessageEvent" else None
 
 
+MOD_EVENTS = {"App\\Events\\MessageDeletedEvent": "deleted", "App\\Events\\UserBannedEvent": "banned"}
+
+
+def mod_event(frame):
+    """Başka bir moderatörün silme/ban/timeout olayıysa {"_event": "deleted"|"banned", ...olay alanları}, değilse None."""
+    data = (frame.get("push") or {}).get("pub", {}).get("data") or {}
+    kind = MOD_EVENTS.get(data.get("event"))
+    return {"_event": kind, **json.loads(data["data"])} if kind else None
+
+
 def messages(get_room):
     """Sonsuz üreteç: get_room() ile verilen odanın chat mesajlarını verir.
     Bağlantı koparsa 5 sn sonra, oda değişirse hemen yeniden bağlanır. get_room() 0 verirse (bot durduruldu) bekler."""
@@ -53,6 +63,8 @@ def messages(get_room):
                             STATE["chat"] = True
                         elif (msg := chat_message(frame)) is not None:
                             yield msg
+                        elif (ev := mod_event(frame)) is not None:
+                            yield ev
                     if time.time() > renew:
                         ws.send(json.dumps({"refresh": {"token": _token(client_id)}, "id": 3}))
                         renew = time.time() + REFRESH

@@ -24,12 +24,15 @@ def init(path=None):
             CREATE TABLE IF NOT EXISTS messages(
                 id TEXT PRIMARY KEY, at REAL, user_id INTEGER, username TEXT, content TEXT, exempt INTEGER);
             CREATE TABLE IF NOT EXISTS counters(
-                user_id INTEGER, rule TEXT, count INTEGER, PRIMARY KEY(user_id, rule));
+                user_id INTEGER, rule TEXT, count INTEGER, at REAL, PRIMARY KEY(user_id, rule));
             CREATE TABLE IF NOT EXISTS violations(
                 id INTEGER PRIMARY KEY, at REAL, user_id INTEGER, username TEXT, rule TEXT, count INTEGER,
                 action TEXT, detail TEXT, evidence TEXT, status TEXT, notes TEXT DEFAULT '');
             CREATE TABLE IF NOT EXISTS examples(text TEXT PRIMARY KEY, label TEXT, note TEXT, at REAL);
         """)
+        if "at" not in [c["name"] for c in _con.execute("PRAGMA table_info(counters)")]:  # eski veritabanı
+            _con.execute("ALTER TABLE counters ADD COLUMN at REAL")
+            _con.execute("UPDATE counters SET at=?", (time.time(),))
 
 
 def _q(sql, *args):
@@ -44,15 +47,29 @@ def add_message(mid, user_id, username, content, exempt):
                             (mid, time.time(), user_id, username, content, int(exempt))).rowcount == 1
 
 
+def message(mid):
+    rows = _q("SELECT * FROM messages WHERE id=?", mid)
+    return rows[0] if rows else None
+
+
 def recent(n, user_id=None):
     """Son n mesaj, eskiden yeniye."""
     where, args = ("WHERE user_id=?", (user_id, n)) if user_id is not None else ("", (n,))
     return _q(f"SELECT * FROM messages {where} ORDER BY rowid DESC LIMIT ?", *args)[::-1]
 
 
+def decay():
+    """Yasaklı kelime sayaçları her blacklist.decay_minutes dakikada kullanıcı başına 1 azalır (caps sayacı kendi kendine sıfırlanıyor)."""
+    period = CFG["blacklist"]["decay_minutes"] * 60
+    _q("""UPDATE counters SET count = MAX(count - CAST((?1 - at) / ?2 AS INTEGER), 0),
+          at = at + CAST((?1 - at) / ?2 AS INTEGER) * ?2 WHERE rule = 'blacklist' AND ?1 - at >= ?2""", time.time(), period)
+    _q("DELETE FROM counters WHERE count = 0")
+
+
 def bump(user_id, rule):
-    return _q("""INSERT INTO counters VALUES(?,?,1) ON CONFLICT(user_id, rule)
-                 DO UPDATE SET count=count+1 RETURNING count""", user_id, rule)[0]["count"]
+    decay()
+    return _q("""INSERT INTO counters VALUES(?,?,1,?) ON CONFLICT(user_id, rule)
+                 DO UPDATE SET count=count+1 RETURNING count""", user_id, rule, time.time())[0]["count"]
 
 
 def reset(user_id, rule=None):
@@ -81,6 +98,7 @@ def examples():
 
 def users():
     """Kullanıcı başına özet: kaç mesajı silindi, kaç timeout ve ban yedi, güncel ihlal sayacı. En son olay başta."""
+    decay()
     return _q("""
         SELECT v.user_id, MAX(v.username) username, MAX(v.at) last,
                SUM(v.action IN ('delete', 'sil') OR (v.rule = 'blacklist' AND v.action IN ('timeout', 'ban'))) deleted,
