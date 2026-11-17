@@ -51,14 +51,14 @@ SHAPE = {
     "caps": {"streak": 1, "min_letters": 1, "timeout_minutes": 1},
     "llm": {"enabled": False, "url": "", "model": "", "context_messages": 1,
             "dry_run": True, "examples": ""},
-    "announcements": {"gap_minutes": 1, "repeat_min_minutes": 1, "repeat_max_minutes": 1, "messages": [""]},
+    "announcements": {"gap_minutes": 1, "repeat_min_minutes": 1, "repeat_max_minutes": 1, "messages": [{"text": "", "active": True}]},
     "commands": {"cooldown_seconds": 1, "items": [{"trigger": "", "response": ""}]},
     "helpers": {"nicks": [""], "commands": [{"trigger": "", "do": "", "minutes": 1}]},
 }
 _CHOICES = {"match": ("exact", "variants", "anywhere"),          # birebir / türevleriyle / her yerde
             "action": ("standard", "delete", "timeout", "ban"),
             "do": ("delete", "timeout", "ban")}  # geçici moderatör komutunun işlemi   # standart / yalnızca sil / doğrudan timeout / doğrudan ban
-_LIMITS = {"examples": 20000, "messages": 500, "url": 200, "response": 450, "trigger": 30}  # metin uzunluk sınırları (varsayılan 100)
+_LIMITS = {"examples": 20000, "text": 500, "url": 200, "response": 450, "trigger": 30}  # metin uzunluk sınırları (varsayılan 100)
 
 
 def _check(value, ref, path, key=""):
@@ -107,6 +107,8 @@ def validate(cfg):
 def migrate(cfg):
     """Eski sürümün ayar dosyasını bugünkü biçime getirir: eksik bölümler varsayılanla dolar, kelimeler yeni alanları alır."""
     cfg = {**copy.deepcopy(DEFAULT), **cfg}
+    cfg["announcements"]["messages"] = [{"text": m, "active": True} if isinstance(m, str) else m  # eski sürümde düz metindi
+                                        for m in cfg["announcements"]["messages"]]
     cfg["blacklist"] = {**DEFAULT["blacklist"], **cfg["blacklist"]}  # eski dosyada "allowed" yok
     cfg["blacklist"]["words"] = [
         {"word": w["word"], "match": w.get("match") or ("anywhere" if w.get("anywhere") else "variants"),

@@ -18,12 +18,13 @@ def run():
         on = STATE["running"] and channel() is not None
         try:
             STATE["live"] = kick.is_live() if on else None
-            if STATE["live"] and c["messages"]:
-                i = pick([last.get(m, 0.0) for m in c["messages"]], time.time(),
+            texts = [m["text"] for m in c["messages"] if m["active"]]
+            if STATE["live"] and texts:
+                i = pick([last.get(m, 0.0) for m in texts], time.time(),
                          c["repeat_min_minutes"] * 60, c["repeat_max_minutes"] * 60)
                 if i is not None:
-                    kick.send(c["messages"][i])
-                    last[c["messages"][i]] = time.time()
+                    kick.send(texts[i])
+                    last[texts[i]] = time.time()
         except Exception as e:  # ağ hatasında bir sonraki turda tekrar dene
             STATE["error"] = f"{time.strftime('%H:%M')} duyuru: {e}"
             traceback.print_exc()

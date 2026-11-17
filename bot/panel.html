@@ -424,15 +424,16 @@ const VIEWS = {
   },
   duyuru() {
     const list = cfg.announcements.messages;
-    return [...head("Duyurular", "Yalnızca yayın açıkken, rastgele sırayla chate yazılır."),
+    return [...head("Duyurular", "Yalnızca yayın açıkken, rastgele sırayla chate yazılır. Kutusu işaretli olmayan duyuru atılmaz."),
       card("Mesajlar",
         list.length ? list.map((m, i) => {
-          const counter = h("span", { class: "hint" }, `${m.length}/500`);
+          const counter = h("span", { class: "hint" }, `${m.text.length}/500`);
           return h("div", { class: "row", style: "margin-bottom:8px;align-items:flex-start" },
-            h("div", { class: "grow" }, h("textarea", { maxlength: 500, value: m, oninput: e => { list[i] = e.target.value; counter.textContent = `${e.target.value.length}/500`; markDirty(); } }), counter),
+            h("input", { type: "checkbox", checked: m.active, title: "Açıkken bu duyuru atılır", onchange: e => { m.active = e.target.checked; markDirty(); } }),
+            h("div", { class: "grow" }, h("textarea", { maxlength: 500, value: m.text, oninput: e => { m.text = e.target.value; counter.textContent = `${e.target.value.length}/500`; markDirty(); } }), counter),
             h("button", { class: "x", title: "Sil", onclick: () => { list.splice(i, 1); markDirty(); render(); } }, "×"));
         }) : h("div", { class: "empty", style: "margin-bottom:10px" }, "Duyuru yok; bot chate bir şey yazmaz."),
-        h("button", { class: "btn", onclick: () => { list.push("Yeni duyuru"); markDirty(); render(); } }, "Duyuru ekle")),
+        h("button", { class: "btn", onclick: () => { list.push({ text: "Yeni duyuru", active: true }); markDirty(); render(); } }, "Duyuru ekle")),
       card("Zamanlama", h("div", { class: "grid" },
         num("announcements.gap_minutes", "İki duyuru arası (dk)"),
         num("announcements.repeat_min_minutes", "Aynı duyuru en erken (dk)", "Bu süre dolmadan aynı duyuru tekrar atılmaz."),

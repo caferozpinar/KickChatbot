@@ -17,7 +17,7 @@ TEST_CFG = {
     "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5},
     "llm": {"enabled": True, "url": "http://localhost:11434", "model": "m", "context_messages": 5,
             "dry_run": True, "examples": ""},
-    "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": ["a"]},
+    "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": [{"text": "a", "active": True}]},
     "commands": {"cooldown_seconds": 10, "items": [{"trigger": "!abone", "response": "abone olmak için link"}]},
     "helpers": {"nicks": ["ali"], "commands": [{"trigger": "!sil", "do": "delete", "minutes": 0}, {"trigger": "!to", "do": "timeout", "minutes": 7}]},
 }
@@ -117,7 +117,7 @@ class Rules(unittest.TestCase):
         for path, bad in ((("caps", "streak"), 0), (("caps", "streak"), "5"), (("caps", "streak"), True),
                           (("blacklist", "timeout_minutes"), 10081), (("channel",), "yok"),
                           (("channels",), [{"slug": "../x", "chatroom_id": 1, "broadcaster_user_id": 1}]),
-                          (("announcements", "messages"), ["x" * 501]), (("channel",), ""),
+                          (("announcements", "messages"), [{"text": "x" * 501, "active": True}]), (("channel",), ""),
                           (("commands", "items"), [{"trigger": "iki kelime", "response": "x"}])):
             cfg = copy.deepcopy(TEST_CFG)
             target = cfg
