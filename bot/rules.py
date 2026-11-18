@@ -1,5 +1,5 @@
 """Saf kural fonksiyonları: ağ ve veritabanı yok, hepsi test edilebilir."""
-import functools, re
+import difflib, functools, re
 
 _EMOTE = re.compile(r"\[emote:\d+:[^\]]*\]")
 _MENTION = re.compile(r"@\w+")
@@ -58,6 +58,12 @@ def blacklist_action(count, strikes, action="standard"):
     if action != "standard":
         return action
     return "delete" if count < strikes else "timeout" if count == strikes else "ban"
+
+
+def similarity(a, b):
+    """İki mesajın kelime kelime benzerliği, 0-100. Kelimeler normalize edilir (büyük/küçük harf, harf uzatma, emote fark etmez)."""
+    x, y = normalize(a).split(), normalize(b).split()
+    return round(100 * difflib.SequenceMatcher(None, x, y).ratio()) if x and y else 0
 
 
 def is_caps(text, min_letters):

@@ -18,6 +18,7 @@ TEST_CFG = {
     "llm": {"enabled": True, "url": "http://localhost:11434", "model": "m", "context_messages": 5,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": [{"text": "a", "active": True}]},
+    "spam": {"enabled": True, "similarity_percent": 80, "repeat_count": 3, "min_words": 3, "timeout_minutes": 5, "warning": "spam yapma"},
     "commands": {"cooldown_seconds": 10, "items": [{"trigger": "!abone", "response": "abone olmak için link"}]},
     "helpers": {"nicks": ["ali"], "commands": [{"trigger": "!sil", "do": "delete", "minutes": 0}, {"trigger": "!to", "do": "timeout", "minutes": 7}]},
 }
@@ -107,6 +108,12 @@ class Rules(unittest.TestCase):
         self.assertEqual(lines, [("Kişi1", "selam @Yayıncı ve @Kişi3, sen nasılsın"), ("Kişi2", "Kişi1 sus, Yayıncı haklı")])
         self.assertEqual(llm.unmask("Kişi1 ve Yayıncı, Kişi9", real), "Ahmet54 ve Charasy, Kişi9")
 
+    def test_similarity(self):
+        self.assertEqual(rules.similarity("Selam nasılsınız HERKES", "selam nasılsınııız herkes"), 100)
+        self.assertEqual(rules.similarity("bir iki üç dört beş", "bir iki üç dört altı"), 80)
+        self.assertEqual(rules.similarity("bir iki üç", "dört beş altı"), 0)
+        self.assertEqual(rules.similarity("[emote:1:x]", "selam"), 0)
+
     def test_pick(self):
         self.assertIsNone(announcer.pick([90, 95], 100, 20, 40))       # hepsi çok yeni
         self.assertEqual(announcer.pick([90, 75], 100, 20, 40), 1)     # yalnızca biri min'i geçti
@@ -114,7 +121,7 @@ class Rules(unittest.TestCase):
 
     def test_validate(self):
         self.assertEqual(validate(copy.deepcopy(TEST_CFG)), TEST_CFG)
-        for path, bad in ((("caps", "streak"), 0), (("caps", "streak"), "5"), (("caps", "streak"), True),
+        for path, bad in ((("caps", "streak"), 0), (("caps", "streak"), "5"), (("caps", "streak"), True), (("spam", "repeat_count"), 1),
                           (("blacklist", "timeout_minutes"), 10081), (("channel",), "yok"),
                           (("channels",), [{"slug": "../x", "chatroom_id": 1, "broadcaster_user_id": 1}]),
                           (("announcements", "messages"), [{"text": "x" * 501, "active": True}]), (("channel",), ""),
@@ -242,6 +249,20 @@ class Handle(unittest.TestCase):
         moderation.handle(event("BAĞIRIYORUM"))
         kick.timeout.assert_called_once()
         self.assertEqual(len(json.loads(db.violations(1)[0]["evidence"])), 5)
+
+    def test_spam(self, llm, kick):
+        moderation.handle(event("bu akşam maç var mı", uid=20))
+        moderation.handle(event("tamamen farklı bir cümle", uid=20))
+        moderation.handle(event("tamamen farklı bir cümle", uid=20))
+        moderation.handle(event("[emote:1:KEKW] [emote:1:KEKW]", uid=20))  # emote zinciri bozmaz, sayılmaz
+        kick.timeout.assert_not_called()  # 2 tekrar henüz yetmez
+        moderation.handle(event("tamamen farklı bir cümle", uid=20))
+        kick.timeout.assert_called_once()
+        kick.send.assert_called_once_with("@u20 spam yapma")
+        moderation.handle(event("selam", uid=21)); moderation.handle(event("selam", uid=21))  # kısa mesaj
+        moderation.handle(event("tamamen farklı bir cümle", uid=22, badges=["moderator"]))
+        moderation.handle(event("tamamen farklı bir cümle", uid=22, badges=["moderator"]))  # muaf
+        kick.timeout.assert_called_once()
 
     def test_exempt_duplicate_mention(self, llm, kick):
         moderation.handle(event("yarrak", badges=["moderator"]))

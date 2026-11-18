@@ -133,6 +133,18 @@ def handle(ev):
             else:
                 print(f"[hedefli kelime] {name}: {text!r} -> '{word}', incelemeye alındı", flush=True)
                 db.log(uid, name, "hedefli", 0, "inceleme", word, rows, "open")
+        sp = CFG["spam"]
+        if sp["enabled"] and len(rules.normalize(text).split()) >= sp["min_words"]:
+            # Bu mesajdan önceki, yalnızca emotelerden oluşmayan mesajlar; emote spamı sayılmaz.
+            prev = [m for m in db.recent(sp["repeat_count"] * 5, uid)[:-1] if rules.normalize(m["content"]).split()][-(sp["repeat_count"] - 1):]
+            sims = [rules.similarity(m["content"], text) for m in prev]
+            if len(prev) == sp["repeat_count"] - 1 and min(sims) >= sp["similarity_percent"]:
+                print(f"[spam] {name}: {text!r} -> {sp['repeat_count']} kez tekrar (en düşük benzerlik %{min(sims)})", flush=True)
+                db.log(uid, name, "spam", 0, "timeout", f"{sp['repeat_count']} kez tekrar, %{min(sims)}+ benzer", [*prev, me])
+                kick.timeout(uid, sp["timeout_minutes"], "Spam")
+                if sp["warning"]:
+                    kick.send(f"@{name} {sp['warning']}")
+                return
         if rules.is_caps(text, CFG["caps"]["min_letters"]):
             count = db.bump(uid, "caps")
             print(f"[caps] {name}: {text!r} -> ardışık caps #{count}", flush=True)

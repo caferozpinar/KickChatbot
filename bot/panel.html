@@ -127,6 +127,7 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
   <div class="spacer"></div>
   <div id="pills" class="row"></div>
   <button class="btn" id="power"></button>
+  <button class="btn danger" id="quit" title="Botu tamamen kapatır">Kapat</button>
 </header>
 <div class="layout">
   <nav id="nav"></nav>
@@ -137,10 +138,10 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
 <script>
 "use strict";
 // Chat mesajları güvenilmeyen içeriktir: sayfaya yalnızca metin düğümü olarak eklenir, asla HTML olarak değil.
-const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Büyük harf"], ["kullanici", "Kullanıcılar"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["yardimci", "Geçici moderatörler"], ["model", "Yapay zekâ"], ["inceleme", "İnceleme"]];
-const RULES = { blacklist: "Yasaklı kelime", caps: "Büyük harf", etiket: "Etiket", llm: "Yapay zekâ", hedefli: "Hedefli kelime", panel: "Elle", mod: "Başka moderatör", yardimci: "Geçici moderatör" };
+const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Büyük harf"], ["spam", "Spam koruması"], ["kullanici", "Kullanıcılar"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["yardimci", "Geçici moderatörler"], ["model", "Yapay zekâ"], ["inceleme", "İnceleme"]];
+const RULES = { blacklist: "Yasaklı kelime", caps: "Büyük harf", spam: "Spam", etiket: "Etiket", llm: "Yapay zekâ", hedefli: "Hedefli kelime", panel: "Elle", mod: "Başka moderatör", yardimci: "Geçici moderatör" };
 const ACTIONS = { delete: "mesaj silindi", timeout: "susturuldu (timeout)", ban: "banlandı", inceleme: "inceleme bekliyor", sil: "model sildi", serbest: "model serbest bıraktı" };
-let users = null, cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
+let leaving = false, users = null, cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
 
 const $ = id => document.getElementById(id);
 function h(tag, props, ...kids) {
@@ -276,7 +277,7 @@ const VIEWS = {
     const secret = h("input", { type: "password", placeholder: "Gizli anahtar (Client Secret)", autocomplete: "off" });
     async function connect() {
       if (!status.has_app && !(id.value.trim() && secret.value.trim())) return toast("Uygulama kimliği ve gizli anahtar gerekli", true);
-      try { location.href = (await api("/api/login", { client_id: id.value, client_secret: secret.value })).url; }
+      try { const url = (await api("/api/login", { client_id: id.value, client_secret: secret.value })).url; leaving = true; location.href = url; }  // Kick'e gidip dönerken uygulama kapanmasın
       catch (e) { toast(e.message, true); }
     }
     const ch = current();
@@ -346,13 +347,6 @@ const VIEWS = {
           h("button", { class: "btn", onclick: () => { const t = badge.value.trim().toLowerCase(), v = Object.keys(BADGE_NAMES).find(k => k === t || BADGE_NAMES[k].toLowerCase() === t) || t; if (v && !cfg.exempt_badges.includes(v)) { cfg.exempt_badges.push(v); markDirty(); render(); } } }, "Rozet ekle")),
         h("p", { class: "hint" }, "Bu rozetlere sahip kullanıcılara hiçbir kural uygulanmaz. Kick'teki rozetler: Yayıncı, Moderatör, VIP, OG, Abone, Kurucu.")),
       status.error && card("Son hata", h("div", { class: "hint" }, status.error)),
-      card("Uygulama", h("div", { class: "row" },
-        h("button", { class: "btn danger", onclick: async () => {
-          if (!confirm("Bot tamamen kapatılsın mı? Yeniden açmak için uygulamayı tekrar çalıştırman gerekir.")) return;
-          try { await api("/api/quit", {}); } catch (e) {}
-          document.body.replaceChildren(h("div", { class: "empty", style: "margin:60px auto;max-width:420px" }, "Bot kapatıldı. Bu sekmeyi kapatabilirsin."));
-        } }, "Uygulamayı kapat"),
-        h("span", { class: "hint" }, "Bot arka planda çalışır; bu sekmeyi kapatmak botu durdurmaz."))),
     ];
   },
   kelime() {
@@ -422,9 +416,24 @@ const VIEWS = {
         num("caps.min_letters", "En az harf sayısı", "Bundan kısa mesajlar caps sayılmaz (GG, XD gibi)."),
         num("caps.timeout_minutes", "Timeout süresi (dk)")))];
   },
+  spam() {
+    return [...head("Spam koruması", "Bir kullanıcı art arda yeterince benzer mesajı belirlenen sayıda tekrar ederse susturulur ve chate uyarı yazılır. Hızlı yazmak sorun değil, aynı şeyi tekrarlamak sorun. Emote'lar hesaba katılmaz: yalnızca emote içeren mesajlar sayılmaz ve zinciri bozmaz."),
+      card(null, toggle("spam.enabled", "Spam korumasını aç", "Muaf rozetliler (yayıncı, moderatör, VIP) kontrol edilmez.")),
+      card("Ayarlar", h("div", { class: "grid" },
+        num("spam.similarity_percent", "Benzerlik yüzdesi (1-100)", "Mesajlar kelime kelime kıyaslanır; bu yüzde ve üstü benzerlik \"aynı mesaj\" sayılır. Örnek: \"selam nasılsınız\" ile \"selam nasılsınız herkes\" %80 benzer."),
+        num("spam.repeat_count", "Kaç tekrarda timeout", "Art arda bu kadar benzer mesaj atılınca (sonuncusu dahil) timeout atılır. Genelde 3; 2 ile 50 arası."),
+        num("spam.min_words", "En az kelime sayısı", "Bundan kısa mesajlar kontrol edilmez (\"selam\", \"gg\" tekrarı spam sayılmasın)."),
+        num("spam.timeout_minutes", "Timeout süresi (dk)"))),
+      card("Uyarı mesajı", text("spam.warning", "Chate yazılacak uyarı", "Kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz, yalnızca timeout atılır."))];
+  },
   duyuru() {
     const list = cfg.announcements.messages;
-    return [...head("Duyurular", "Yalnızca yayın açıkken, rastgele sırayla chate yazılır. Kutusu işaretli olmayan duyuru atılmaz."),
+    const MODES = { auto: "Otomatik", on: "Başlat (yayın kapalıyken de)", off: "Durdur" };
+    return [...head("Duyurular", "Rastgele sırayla chate yazılır. Kutusu işaretli olmayan duyuru atılmaz."),
+      card("Gönderim",
+        h("div", { class: "tabs" }, Object.entries(MODES).map(([k, l]) => h("button", { class: status.announce === k ? "on" : "",
+          onclick: async () => { try { await api("/api/announce", { mode: k }); await poll(); render(); } catch (e) { toast(e.message, true); } } }, l))),
+        h("p", { class: "hint", style: "margin:0" }, "Otomatik: yalnızca yayın açıkken atılır. Başlat: yayın durumu algılanmasa ya da yayın kapalı olsa da atılır. Durdur: hiç atılmaz. Bot durdurulmuşsa (üstteki Durdur) duyuru da atılmaz. Bu seçim uygulama kapanınca Otomatik'e döner.")),
       card("Mesajlar",
         list.length ? list.map((m, i) => {
           const counter = h("span", { class: "hint" }, `${m.text.length}/500`);
@@ -593,9 +602,19 @@ async function power(on) {
   catch (e) { toast(e.message, true); if (!ready()) go("kurulum"); }
 }
 $("power").onclick = () => power(!status.running);
+async function quit() {
+  if (!confirm("Bot tamamen kapatılsın mı? Yeniden açmak için uygulamayı tekrar çalıştırman gerekir.")) return;
+  leaving = true;
+  try { await api("/api/quit", {}); } catch (e) {}
+  document.body.replaceChildren(h("div", { class: "empty", style: "margin:60px auto;max-width:420px" }, "Bot kapatıldı. Bu sekmeyi kapatabilirsin."));
+}
+$("quit").onclick = quit;
 $("discard").onclick = () => { cfg = JSON.parse(saved); render(); };
 $("channel").onchange = e => { set("channel", e.target.value); render(); };
-window.addEventListener("beforeunload", e => { if (cfg && isDirty()) e.preventDefault(); });
+// Sekmeyi kapatmak uygulamayı da kapatır: tarayıcı onay sorar; onaylanırsa sayfa kapanırken sunucuya haber gider
+// (sayfa yenilemesinde sunucu 8 sn içinde yeni istek görüp kapanmaz).
+window.addEventListener("beforeunload", e => { if (!leaving) e.preventDefault(); });
+window.addEventListener("pagehide", () => { if (!leaving) navigator.sendBeacon("/api/bye", new Blob(["{}"], { type: "application/json" })); });
 (async () => {
   await poll();
   if (!cfg) return $("main").replaceChildren(h("div", { class: "empty" }, "Bota ulaşılamıyor. Uygulama açık mı? Kapalıysa yeniden çalıştır."));

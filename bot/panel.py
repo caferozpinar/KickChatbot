@@ -90,6 +90,25 @@ def run(body):
     STATE["running"] = bool(body["on"])
 
 
+def announce(body):
+    """Duyuru modu: auto (yayın durumuna göre) | on (yayın kapalıyken de) | off (hiç)."""
+    if body["mode"] not in ("auto", "on", "off"):
+        raise ValueError("Geçersiz duyuru modu")
+    STATE["announce"] = body["mode"]
+
+
+_bye = None
+
+
+def bye(body):
+    """Sekme kapandı: 8 sn içinde panel yeniden istek atmazsa (sayfa yenileme değilse) uygulamayı kapatır."""
+    global _bye
+    if _bye:
+        _bye.cancel()
+    _bye = threading.Timer(8, os._exit, [0])
+    _bye.start()
+
+
 def login(body):
     try:
         return {"url": kick.login_start(str(body.get("client_id") or ""), str(body.get("client_secret") or ""),
@@ -103,7 +122,7 @@ def quit_app(body):
 
 
 ROUTES = {"/api/config": save_config, "/api/action": action, "/api/test": test, "/api/run": run, "/api/login": login,
-          "/api/quit": quit_app, "/api/resolve": lambda b: {"broadcaster_user_id": kick.resolve(str(b["slug"]))}}
+          "/api/quit": quit_app, "/api/announce": announce, "/api/bye": bye, "/api/resolve": lambda b: {"broadcaster_user_id": kick.resolve(str(b["slug"]))}}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -134,6 +153,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         elif url.path == "/api/state":
+            if _bye:  # sayfa yenilendi, kapanmıyor
+                _bye.cancel()
             self._json(200, state())
         elif url.path == "/api/users":
             self._json(200, [dict(u) for u in db.users()])

@@ -27,7 +27,7 @@ except ImportError:
 
 DATA = _data_dir()
 CONFIG = DATA / "config.json"
-STATE = {"chat": False, "live": None, "error": "", "running": False}  # panelde gösterilen anlık durum
+STATE = {"chat": False, "live": None, "error": "", "running": False, "announce": "auto"}  # panelde gösterilen anlık durum
 
 # Yeni kurulumun ayarı: güvenli taraf (yazdırma modu açık, model kapalı, liste boş).
 DEFAULT = {
@@ -38,6 +38,8 @@ DEFAULT = {
     "llm": {"enabled": False, "url": "http://localhost:11434", "model": "gemma4:e2b", "context_messages": 5,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": []},
+    "spam": {"enabled": False, "similarity_percent": 80, "repeat_count": 3, "min_words": 3, "timeout_minutes": 5,
+             "warning": "lütfen aynı mesajı tekrar tekrar yazma, spam yapma."},
     "commands": {"cooldown_seconds": 10, "items": []},
     "helpers": {"nicks": [], "commands": [{"trigger": "!sil", "do": "delete", "minutes": 0}, {"trigger": "!to", "do": "timeout", "minutes": 5}]},
 }
@@ -52,13 +54,14 @@ SHAPE = {
     "llm": {"enabled": False, "url": "", "model": "", "context_messages": 1,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 1, "repeat_min_minutes": 1, "repeat_max_minutes": 1, "messages": [{"text": "", "active": True}]},
+    "spam": {"enabled": False, "similarity_percent": 1, "repeat_count": 1, "min_words": 1, "timeout_minutes": 1, "warning": ""},
     "commands": {"cooldown_seconds": 1, "items": [{"trigger": "", "response": ""}]},
     "helpers": {"nicks": [""], "commands": [{"trigger": "", "do": "", "minutes": 1}]},
 }
 _CHOICES = {"match": ("exact", "variants", "anywhere"),          # birebir / türevleriyle / her yerde
             "action": ("standard", "delete", "timeout", "ban"),
             "do": ("delete", "timeout", "ban")}  # geçici moderatör komutunun işlemi   # standart / yalnızca sil / doğrudan timeout / doğrudan ban
-_LIMITS = {"examples": 20000, "text": 500, "url": 200, "response": 450, "trigger": 30}  # metin uzunluk sınırları (varsayılan 100)
+_LIMITS = {"examples": 20000, "text": 500, "url": 200, "response": 450, "warning": 450, "trigger": 30}  # metin uzunluk sınırları (varsayılan 100)
 
 
 def _check(value, ref, path, key=""):
@@ -76,7 +79,7 @@ def _check(value, ref, path, key=""):
         value = value.strip()
         if key in _CHOICES and value not in _CHOICES[key]:
             raise ValueError(f"{path}: geçersiz seçenek")
-        if len(value) > _LIMITS.get(key, 100) or (not value and key not in ("examples", "nick", "channel")):  # nick ve kanal kurulumda dolar
+        if len(value) > _LIMITS.get(key, 100) or (not value and key not in ("examples", "nick", "channel", "warning")):  # nick ve kanal kurulumda dolar
             raise ValueError(f"{path}: boş ya da çok uzun")
         if key == "trigger" and " " in value:
             raise ValueError(f"{path}: komut tek kelime olmalı (ör. !abone)")
@@ -101,6 +104,10 @@ def validate(cfg):
     a = cfg["announcements"]
     if a["repeat_min_minutes"] > a["repeat_max_minutes"]:
         raise ValueError("Duyuru tekrar süresinde en az, en çoktan büyük olamaz")
+    if cfg["spam"]["similarity_percent"] > 100:
+        raise ValueError("Spam benzerlik yüzdesi 100'den büyük olamaz")
+    if not 2 <= cfg["spam"]["repeat_count"] <= 50:
+        raise ValueError("Spam tekrar sayısı 2 ile 50 arasında olmalı")
     return cfg
 
 
