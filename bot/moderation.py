@@ -13,11 +13,11 @@ _last = {}  # komut -> son cevaplanma zamanı
 
 
 def command(text, name):
-    """Mesajın herhangi bir yerinde bir komut geçiyorsa (ör. !abone) yazanı etiketleyerek cevabını chate yazar."""
+    """Mesaj bir komutla başlıyorsa (ör. !abone nasıl olunur) yazanı etiketleyerek cevabını chate yazar."""
     c, words = CFG["commands"], text.lower().split()
     for item in c["items"]:
         trigger = item["trigger"].lower()
-        if trigger in words:
+        if words[:1] == [trigger]:
             if time.time() - _last.get(trigger, 0) >= c["cooldown_seconds"]:  # aynı komuta art arda yazılınca chat dolmasın
                 _last[trigger] = time.time()
                 print(f"[komut] {name}: {trigger}", flush=True)

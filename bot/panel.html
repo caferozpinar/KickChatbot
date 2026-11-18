@@ -458,7 +458,7 @@ const VIEWS = {
           h("button", { class: "x", title: "Sil", onclick: () => { list.splice(i, 1); markDirty(); render(); } }, "×")))
           : h("div", { class: "empty", style: "margin-bottom:10px" }, "Henüz komut yok."),
         h("button", { class: "btn", onclick: () => { list.push({ trigger: "!komut", response: "cevap metni" }); markDirty(); render(); } }, "Komut ekle"),
-        h("p", { class: "hint" }, "Komut tek kelime olmalı; mesajın neresinde geçerse geçsin çalışır (\"bana !abone linki ver\"). Büyük/küçük harf fark etmez. Bir mesajda birden fazla komut varsa listede önce gelen cevaplanır. Komutlar yayın kapalıyken de çalışır ve herkes kullanabilir.")),
+        h("p", { class: "hint" }, "Komut tek kelime olmalı; yalnızca mesajın ilk kelimesiyse çalışır (\"!abone nasıl olunur\" çalışır, \"bana !abone linki ver\" çalışmaz). Büyük/küçük harf fark etmez. Bir mesajda birden fazla komut varsa listede önce gelen cevaplanır. Komutlar yayın kapalıyken de çalışır ve herkes kullanabilir.")),
       card("Bekleme", h("div", { class: "grid" },
         num("commands.cooldown_seconds", "Aynı komut için bekleme (sn)", "Bu süre içinde aynı komut tekrar yazılırsa bot cevap vermez; chat dolmasın diye.")))];
   },

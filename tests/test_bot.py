@@ -350,11 +350,10 @@ class Handle(unittest.TestCase):
         moderation.handle(event("!abonelik ne", uid=9))         # başka kelime
         self.assertEqual(kick.send.call_count, 1)
         moderation._last.clear()
-        moderation.handle(event("bana !abone linki ver", uid=9))  # mesajın ortasında da çalışır
-        kick.send.assert_called_with("@u9 abone olmak için link")
-        moderation._last.clear()
+        moderation.handle(event("bana !abone linki ver", uid=9))  # mesajın ortasında çalışmaz
+        self.assertEqual(kick.send.call_count, 1)
         moderation.handle(event("!abone", uid=1, badges=["broadcaster"]))  # muaf kullanıcılar da kullanabilir
-        self.assertEqual(kick.send.call_count, 3)
+        self.assertEqual(kick.send.call_count, 2)
 
     def test_start_needs_chatroom(self, llm, kick):
         self.addCleanup(STATE.update, running=False)
