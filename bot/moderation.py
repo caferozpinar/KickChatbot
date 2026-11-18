@@ -134,17 +134,23 @@ def handle(ev):
                 print(f"[hedefli kelime] {name}: {text!r} -> '{word}', incelemeye alındı", flush=True)
                 db.log(uid, name, "hedefli", 0, "inceleme", word, rows, "open")
         sp = CFG["spam"]
-        if sp["enabled"] and len(rules.normalize(text).split()) >= sp["min_words"]:
-            # Bu mesajdan önceki, yalnızca emotelerden oluşmayan mesajlar; emote spamı sayılmaz.
-            prev = [m for m in db.recent(sp["repeat_count"] * 5, uid)[:-1] if rules.normalize(m["content"]).split()][-(sp["repeat_count"] - 1):]
-            sims = [rules.similarity(m["content"], text) for m in prev]
-            if len(prev) == sp["repeat_count"] - 1 and min(sims) >= sp["similarity_percent"]:
-                print(f"[spam] {name}: {text!r} -> {sp['repeat_count']} kez tekrar (en düşük benzerlik %{min(sims)})", flush=True)
-                db.log(uid, name, "spam", 0, "timeout", f"{sp['repeat_count']} kez tekrar, %{min(sims)}+ benzer", [*prev, me])
-                kick.timeout(uid, sp["timeout_minutes"], "Spam")
-                if sp["warning"]:
-                    kick.send(f"@{name} {sp['warning']}")
-                return
+        if sp["enabled"] and len(rules.normalize(text).split()) >= sp["min_words"]:  # emote'lu/kısa mesaj sayacı ne artırır ne sıfırlar
+            # Önceki mesaj: bu kullanıcının, yalnızca emotelerden oluşmayan son mesajı.
+            prev = next((m for m in reversed(db.recent(10, uid)[:-1]) if rules.normalize(m["content"]).split()), None)
+            if prev:
+                sim = rules.similarity(prev["content"], text)
+                if sim < sp["similarity_percent"]:
+                    db.reset(uid, "spam")
+                else:
+                    count = db.bump(uid, "spam")
+                    print(f"[spam] {name}: {text!r} -> önceki mesaja %{sim} benzer, sayaç {count}/{sp['repeat_count'] - 1}", flush=True)
+                    if count >= sp["repeat_count"] - 1:  # 3 mesaj = 2 benzer çift
+                        db.log(uid, name, "spam", count, "timeout", f"{sp['repeat_count']} kez tekrar, son benzerlik %{sim}", db.recent(sp["repeat_count"], uid))
+                        db.reset(uid, "spam")
+                        kick.timeout(uid, sp["timeout_minutes"], "Spam")
+                        if sp["warning"]:
+                            kick.send(f"@{name} {sp['warning']}")
+                        return
         if rules.is_caps(text, CFG["caps"]["min_letters"]):
             count = db.bump(uid, "caps")
             print(f"[caps] {name}: {text!r} -> ardışık caps #{count}", flush=True)

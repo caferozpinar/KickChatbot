@@ -418,13 +418,25 @@ const VIEWS = {
       card("Uyarı mesajı", text("caps.warning", "Chate yazılacak uyarı", "Timeout'tan sonra kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz."))];
   },
   spam() {
-    return [...head("Spam koruması", "Bir kullanıcı art arda yeterince benzer mesajı belirlenen sayıda tekrar ederse susturulur ve chate uyarı yazılır. Hızlı yazmak sorun değil, aynı şeyi tekrarlamak sorun. Emote'lar hesaba katılmaz: yalnızca emote içeren mesajlar sayılmaz ve zinciri bozmaz."),
+    return [...head("Spam koruması", "Bir kullanıcı art arda yeterince benzer mesajı belirlenen sayıda tekrar ederse susturulur ve chate uyarı yazılır. Kelime sırası, noktalama, büyük/küçük harf ve Türkçe harf farkı (ö/o, ş/s…) önemsenmez. Hızlı yazmak sorun değil. Emote'lar hesaba katılmaz: yalnızca emote içeren mesajlar sayılmaz ve sayacı bozmaz."),
       card(null, toggle("spam.enabled", "Spam korumasını aç", "Muaf rozetliler (yayıncı, moderatör, VIP) kontrol edilmez.")),
       card("Ayarlar", h("div", { class: "grid" },
-        num("spam.similarity_percent", "Benzerlik yüzdesi (1-100)", "Mesajlar kelime kelime kıyaslanır; bu yüzde ve üstü benzerlik \"aynı mesaj\" sayılır. Örnek: \"selam nasılsınız\" ile \"selam nasılsınız herkes\" %80 benzer."),
-        num("spam.repeat_count", "Kaç tekrarda timeout", "Art arda bu kadar benzer mesaj atılınca (sonuncusu dahil) timeout atılır. Genelde 3; 2 ile 50 arası."),
+        num("spam.similarity_percent", "Benzerlik yüzdesi (1-100)", "Ardışık iki mesaj kelime kelime kıyaslanır; bu yüzde ve üstü benzerlik \"aynı mesaj\" sayılır. Örnek: \"selam nasılsınız\" ile \"selam nasılsınız herkes\" %80 benzer."),
+        num("spam.repeat_count", "Kaç tekrarda timeout", "Art arda bu kadar benzer mesaj atılınca (sonuncusu dahil) timeout atılır; yani benzer çift sayısı bunun 1 eksiği olunca. Genelde 3; 2 ile 50 arası."),
         num("spam.min_words", "En az kelime sayısı", "Bundan kısa mesajlar kontrol edilmez (\"selam\", \"gg\" tekrarı spam sayılmasın)."),
         num("spam.timeout_minutes", "Timeout süresi (dk)"))),
+      card("Dene", (() => {
+        const a = h("textarea", { placeholder: "1. mesaj" }), b = h("textarea", { placeholder: "2. mesaj" }), out = h("div", { class: "result" });
+        return h("div", null, h("div", { class: "grid" }, a, b),
+          h("div", { class: "row", style: "margin-top:10px" }, h("button", { class: "btn", onclick: async () => {
+            if (isDirty()) return toast("Önce değişiklikleri kaydet; deneme kayıtlı ayarlarla yapılır", true);
+            try {
+              const r = await api("/api/spamtest", { a: a.value, b: b.value });
+              out.replaceChildren(h("div", { class: r.similar ? "hit" : "clean" }, `Benzerlik: %${r.percent} → ` + (r.similar ? "spam sayacı 1 artar" : "spam sayacı sıfırlanır")));
+            } catch (e) { toast(e.message, true); }
+          } }, "Karşılaştır")), out,
+          h("p", { class: "hint" }, "Bot her yeni mesajı kullanıcının bir önceki mesajıyla böyle karşılaştırır. Eşik ve üstüyse sayaç artar, altındaysa sıfırlanır. Sayaç \"kaç tekrarda timeout\" − 1 değerine gelince timeout atılır."));
+      })()),
       card("Uyarı mesajı", text("spam.warning", "Chate yazılacak uyarı", "Kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz, yalnızca timeout atılır."))];
   },
   duyuru() {

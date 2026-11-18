@@ -25,6 +25,12 @@ def test(body):
             "caps": rules.is_caps(text, CFG["caps"]["min_letters"])}
 
 
+def spam_test(body):
+    """İki metnin benzerliği ve bu benzerlikte spam sayacına ne olacağı."""
+    pct = rules.similarity(str(body["a"]), str(body["b"]))
+    return {"percent": pct, "similar": pct >= CFG["spam"]["similarity_percent"]}
+
+
 def action(body):
     """Bir kayıt üzerinden elle aksiyon. Hedef, o kaydın kanıtındaki bir mesaj ya da kullanıcı olmak zorunda."""
     if body["action"] == "reset_user":  # Kullanıcılar sayfasından: kayıtla ilgisiz, yalnızca sayaç sıfırlama
@@ -122,7 +128,7 @@ def quit_app(body):
 
 
 ROUTES = {"/api/config": save_config, "/api/action": action, "/api/test": test, "/api/run": run, "/api/login": login,
-          "/api/quit": quit_app, "/api/announce": announce, "/api/bye": bye, "/api/resolve": lambda b: {"broadcaster_user_id": kick.resolve(str(b["slug"]))}}
+          "/api/quit": quit_app, "/api/announce": announce, "/api/spamtest": spam_test, "/api/bye": bye, "/api/resolve": lambda b: {"broadcaster_user_id": kick.resolve(str(b["slug"]))}}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

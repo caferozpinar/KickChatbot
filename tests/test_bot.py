@@ -113,6 +113,9 @@ class Rules(unittest.TestCase):
         self.assertEqual(rules.similarity("bir iki üç dört beş", "bir iki üç dört altı"), 80)
         self.assertEqual(rules.similarity("bir iki üç", "dört beş altı"), 0)
         self.assertEqual(rules.similarity("[emote:1:x]", "selam"), 0)
+        self.assertEqual(rules.similarity("dün geceki boss kesme çok iyiydi bence", "çok iyiydi bence dün geceki boss kesme"), 100)  # sıra
+        self.assertEqual(rules.similarity("selamlar millet bugün yayın kaçta açılıyor acaba", "selaaamlar millet bugun yayin kacta aciliyor acaba?"), 100)
+        self.assertLess(rules.similarity("bu haritada gizli sandık nerede bulunuyor bilen var mı", "bu bölgedeki saklı kutu nerede yer alıyor fikri olan var mı"), 50)
 
     def test_pick(self):
         self.assertIsNone(announcer.pick([90, 95], 100, 20, 40))       # hepsi çok yeni
@@ -256,10 +259,13 @@ class Handle(unittest.TestCase):
         moderation.handle(event("tamamen farklı bir cümle", uid=20))
         moderation.handle(event("tamamen farklı bir cümle", uid=20))
         moderation.handle(event("[emote:1:KEKW] [emote:1:KEKW]", uid=20))  # emote zinciri bozmaz, sayılmaz
-        kick.timeout.assert_not_called()  # 2 tekrar henüz yetmez
+        kick.timeout.assert_not_called()  # 2 tekrar henüz yetmez (3 mesaj gerekir)
         moderation.handle(event("tamamen farklı bir cümle", uid=20))
         kick.timeout.assert_called_once()
         kick.send.assert_called_once_with("@u20 spam yapma")
+        for text in ("aynı cümle burada", "aynı cümle burada", "bambaşka bir şey yazdım", "aynı cümle burada", "aynı cümle burada"):
+            moderation.handle(event(text, uid=23))                    # araya farklı mesaj girince sayaç sıfırlanır
+        kick.timeout.assert_called_once()
         moderation.handle(event("selam", uid=21)); moderation.handle(event("selam", uid=21))  # kısa mesaj
         moderation.handle(event("tamamen farklı bir cümle", uid=22, badges=["moderator"]))
         moderation.handle(event("tamamen farklı bir cümle", uid=22, badges=["moderator"]))  # muaf
