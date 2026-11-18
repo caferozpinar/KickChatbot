@@ -152,6 +152,8 @@ def handle(ev):
                 db.log(uid, name, "caps", count, "timeout", "", db.recent(count, uid))
                 db.reset(uid, "caps")
                 kick.timeout(uid, CFG["caps"]["timeout_minutes"], "Sürekli büyük harf")
+                if CFG["caps"]["warning"]:
+                    kick.send(f"@{name} {CFG['caps']['warning']}")
                 return
         else:
             db.reset(uid, "caps")

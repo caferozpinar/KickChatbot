@@ -14,7 +14,7 @@ TEST_CFG = {
     "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "decay_minutes": 30, "allowed": ["ooc"], "words": [
         {"word": "yarrak", "match": "variants", "targeted": False, "action": "standard", "minutes": 0},
         {"word": "amk", "match": "variants", "targeted": True, "action": "standard", "minutes": 0}]},
-    "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5},
+    "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5, "warning": "bağırma"},
     "llm": {"enabled": True, "url": "http://localhost:11434", "model": "m", "context_messages": 5,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": [{"text": "a", "active": True}]},
@@ -248,6 +248,7 @@ class Handle(unittest.TestCase):
         kick.timeout.assert_not_called()
         moderation.handle(event("BAĞIRIYORUM"))
         kick.timeout.assert_called_once()
+        kick.send.assert_called_once_with("@u7 bağırma")
         self.assertEqual(len(json.loads(db.violations(1)[0]["evidence"])), 5)
 
     def test_spam(self, llm, kick):

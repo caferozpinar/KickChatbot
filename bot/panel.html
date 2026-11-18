@@ -414,7 +414,8 @@ const VIEWS = {
       card(null, h("div", { class: "grid" },
         num("caps.streak", "Art arda kaç caps mesajda", "Bu sayıya ulaşınca timeout atılır."),
         num("caps.min_letters", "En az harf sayısı", "Bundan kısa mesajlar caps sayılmaz (GG, XD gibi)."),
-        num("caps.timeout_minutes", "Timeout süresi (dk)")))];
+        num("caps.timeout_minutes", "Timeout süresi (dk)"))),
+      card("Uyarı mesajı", text("caps.warning", "Chate yazılacak uyarı", "Timeout'tan sonra kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz."))];
   },
   spam() {
     return [...head("Spam koruması", "Bir kullanıcı art arda yeterince benzer mesajı belirlenen sayıda tekrar ederse susturulur ve chate uyarı yazılır. Hızlı yazmak sorun değil, aynı şeyi tekrarlamak sorun. Emote'lar hesaba katılmaz: yalnızca emote içeren mesajlar sayılmaz ve zinciri bozmaz."),

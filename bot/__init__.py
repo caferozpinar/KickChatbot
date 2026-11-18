@@ -34,7 +34,7 @@ DEFAULT = {
     "dry_run": True, "nick": "", "exempt_badges": ["broadcaster", "moderator", "vip"],
     "channel": "", "channels": [],
     "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [], "allowed": [], "decay_minutes": 30},
-    "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5},
+    "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5, "warning": "lütfen büyük harfle yazma."},
     "llm": {"enabled": False, "url": "http://localhost:11434", "model": "gemma4:e2b", "context_messages": 5,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 5, "repeat_min_minutes": 20, "repeat_max_minutes": 40, "messages": []},
@@ -50,7 +50,7 @@ SHAPE = {
     "channel": "",
     "channels": [{"slug": "", "chatroom_id": 1, "broadcaster_user_id": 1}],
     "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "match": "", "targeted": False, "action": "", "minutes": 1}], "allowed": [""], "decay_minutes": 1},
-    "caps": {"streak": 1, "min_letters": 1, "timeout_minutes": 1},
+    "caps": {"streak": 1, "min_letters": 1, "timeout_minutes": 1, "warning": ""},
     "llm": {"enabled": False, "url": "", "model": "", "context_messages": 1,
             "dry_run": True, "examples": ""},
     "announcements": {"gap_minutes": 1, "repeat_min_minutes": 1, "repeat_max_minutes": 1, "messages": [{"text": "", "active": True}]},
@@ -114,6 +114,7 @@ def validate(cfg):
 def migrate(cfg):
     """Eski sürümün ayar dosyasını bugünkü biçime getirir: eksik bölümler varsayılanla dolar, kelimeler yeni alanları alır."""
     cfg = {**copy.deepcopy(DEFAULT), **cfg}
+    cfg["caps"] = {**DEFAULT["caps"], **cfg["caps"]}  # eski dosyada "warning" yok
     cfg["announcements"]["messages"] = [{"text": m, "active": True} if isinstance(m, str) else m  # eski sürümde düz metindi
                                         for m in cfg["announcements"]["messages"]]
     cfg["blacklist"] = {**DEFAULT["blacklist"], **cfg["blacklist"]}  # eski dosyada "allowed" yok
