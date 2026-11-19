@@ -1,5 +1,5 @@
 """Saf kural fonksiyonları: ağ ve veritabanı yok, hepsi test edilebilir."""
-import collections, functools, re
+import difflib, functools, re
 
 _EMOTE = re.compile(r"\[emote:\d+:[^\]]*\]")
 _MENTION = re.compile(r"@\w+")
@@ -60,16 +60,32 @@ def blacklist_action(count, strikes, action="standard"):
     return "delete" if count < strikes else "timeout" if count == strikes else "ban"
 
 
-def _bag(text):
+_VOWELS = re.compile("[aeiou]")  # Türkçe harfler _PLAIN ile sadeleştikten sonra
+
+
+def _words(text):
     """Mesajın kelimeleri: noktalama atılır, Türkçe harfler sadeleşir, emote ve harf uzatma fark etmez."""
-    return collections.Counter(re.findall(r"\w+", normalize(text).translate(str.maketrans(_PLAIN))))
+    return re.findall(r"\w+", normalize(text).translate(str.maketrans(_PLAIN)))
+
+
+def _same(a, b):
+    """Kelimeyi sessiz harfleri belirler ('geldin' ~ 'geledin', 'mo' ~ 'mu'): sesliler çıkarılınca aynı kalanlar, uzun kelimelerde (4+ sessiz) %80 ve üstü benzeyenler de aynı sayılır."""
+    ka, kb = _VOWELS.sub("", a) or a, _VOWELS.sub("", b) or b  # sesliden ibaret kelime kendisiyle kıyaslanır
+    return ka == kb or (min(len(ka), len(kb)) > 3 and difflib.SequenceMatcher(None, ka, kb).ratio() >= 0.8)
 
 
 def similarity(a, b):
-    """İki mesajın kelime benzerliği, 0-100 (ortak kelime / toplam kelime). Kelime sırası fark etmez."""
-    x, y = _bag(a), _bag(b)
-    total = sum(x.values()) + sum(y.values())
-    return round(200 * sum((x & y).values()) / total) if total else 0
+    """İki mesajın kelime benzerliği, 0-100 (eşleşen kelime / toplam kelime). Kelime sırası fark etmez."""
+    x, y = _words(a), _words(b)
+    if not x or not y:
+        return 0
+    left, matched = list(y), 0
+    for w in x:  # her kelime diğer mesajda henüz eşleşmemiş benzer bir kelimeyle eşlenir
+        i = next((i for i, v in enumerate(left) if _same(w, v)), None)
+        if i is not None:
+            del left[i]
+            matched += 1
+    return round(200 * matched / (len(x) + len(y)))
 
 
 def is_caps(text, min_letters):

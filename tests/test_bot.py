@@ -115,7 +115,9 @@ class Rules(unittest.TestCase):
         self.assertEqual(rules.similarity("[emote:1:x]", "selam"), 0)
         self.assertEqual(rules.similarity("dün geceki boss kesme çok iyiydi bence", "çok iyiydi bence dün geceki boss kesme"), 100)  # sıra
         self.assertEqual(rules.similarity("selamlar millet bugün yayın kaçta açılıyor acaba", "selaaamlar millet bugun yayin kacta aciliyor acaba?"), 100)
-        self.assertLess(rules.similarity("bu haritada gizli sandık nerede bulunuyor bilen var mı", "bu bölgedeki saklı kutu nerede yer alıyor fikri olan var mı"), 50)
+        self.assertEqual(rules.similarity("deneme bugun geldin mo", "deneme bugün geledin mu"), 100)  # sesliler fark etmez
+        self.assertEqual(rules.similarity("ben geldim", "sen gittin"), 0)
+        self.assertLess(rules.similarity("bu haritada gizli sandık nerede bulunuyor bilen var mı", "bu bölgedeki saklı kutu nerede yer alıyor fikri olan var mı"), 45)
 
     def test_pick(self):
         self.assertIsNone(announcer.pick([90, 95], 100, 20, 40))       # hepsi çok yeni
