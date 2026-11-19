@@ -18,6 +18,12 @@ def violations(query):
     return [{**dict(v), "evidence": json.loads(v["evidence"])} for v in db.violations(200, status)]
 
 
+def user_history(query):
+    h = db.history(int(query["id"][0]))
+    return {"violations": [{**dict(v), "evidence": json.loads(v["evidence"])} for v in h["violations"]],
+            "messages": [dict(m) for m in h["messages"]]}
+
+
 def test(body):
     text = str(body["text"])
     hit, soft = rules.blacklist_hit(text, moderation.blacklist(), CFG["blacklist"]["allowed"]), rules.blacklist_hit(text, moderation.blacklist(targeted=True), CFG["blacklist"]["allowed"])
@@ -164,6 +170,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(200, state())
         elif url.path == "/api/users":
             self._json(200, [dict(u) for u in db.users()])
+        elif url.path == "/api/user":
+            try:
+                self._json(200, user_history(urllib.parse.parse_qs(url.query)))
+            except (KeyError, ValueError, IndexError):
+                self._json(400, {"error": "Geçersiz istek"})
         elif url.path == "/api/violations":
             self._json(200, violations(urllib.parse.parse_qs(url.query)))
         else:

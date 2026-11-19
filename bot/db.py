@@ -114,6 +114,12 @@ def violations(n, status=None):
     return _q("SELECT * FROM violations ORDER BY id DESC LIMIT ?", n)
 
 
+def history(user_id):
+    """Kullanıcının tüm ihlal kayıtları (kanıt mesajlarıyla) ve mesaj geçmişi. Sayaç sıfırlansa da silinmez."""
+    return {"violations": _q("SELECT * FROM violations WHERE user_id=? ORDER BY id DESC", user_id),
+            "messages": _q("SELECT at, content FROM messages WHERE user_id=? ORDER BY rowid DESC", user_id)}
+
+
 def violation(vid):
     rows = _q("SELECT * FROM violations WHERE id=?", vid)
     return rows[0] if rows else None

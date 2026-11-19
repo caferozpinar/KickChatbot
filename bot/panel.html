@@ -141,7 +141,7 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
 const PAGES = [["kurulum", "Kurulum"], ["genel", "Genel"], ["kelime", "Yasaklı kelimeler"], ["caps", "Büyük harf"], ["spam", "Spam koruması"], ["kullanici", "Kullanıcılar"], ["duyuru", "Duyurular"], ["komut", "Komutlar"], ["yardimci", "Geçici moderatörler"], ["model", "Yapay zekâ"], ["inceleme", "İnceleme"]];
 const RULES = { blacklist: "Yasaklı kelime", caps: "Büyük harf", spam: "Spam", etiket: "Etiket", llm: "Yapay zekâ", hedefli: "Hedefli kelime", panel: "Elle", mod: "Başka moderatör", yardimci: "Geçici moderatör" };
 const ACTIONS = { delete: "mesaj silindi", timeout: "susturuldu (timeout)", ban: "banlandı", inceleme: "inceleme bekliyor", sil: "model sildi", serbest: "model serbest bıraktı" };
-let leaving = false, users = null, cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
+let hist = null, leaving = false, users = null, cfg = null, saved = "", page = location.hash.slice(1), status = {}, openCount = 0, items = [], itemsKey = "", filter = "open";
 
 const $ = id => document.getElementById(id);
 function h(tag, props, ...kids) {
@@ -516,11 +516,18 @@ const VIEWS = {
           h("th", { class: "n" }, "Ban"), h("th", { class: "n" }, "Güncel ihlal sayacı"), h("th", null, "Son olay"), h("th", null, ""))),
         h("tbody", null, users.map(u => h("tr", null, h("td", null, h("b", null, u.username)), num(u.deleted), num(u.timeouts, true), num(u.bans, true), num(u.strikes),
           h("td", { class: "hint" }, new Date(u.last * 1000).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })),
-          h("td", null, u.strikes ? h("button", { class: "btn small", onclick: async () => {
+          h("td", null, h("button", { class: "btn small", onclick: async () => {
+            try { hist = { name: u.username, ...await api("/api/user?id=" + u.user_id) }; render(); } catch (e) { toast(e.message, true); } } }, "Geçmiş"), " ", u.strikes ? h("button", { class: "btn small", onclick: async () => {
             if (!confirm(`${u.username} kullanıcısının ihlal sayacı sıfırlansın mı? (Geçmiş kayıtlar silinmez.)`)) return;
             try { await api("/api/action", { action: "reset_user", user_id: u.user_id }); await loadUsers(); } catch (e) { toast(e.message, true); } } }, "Sayacı sıfırla") : null))))))
         : h("div", { class: "empty" }, "Henüz kayıtlı bir ihlal yok."),
-      h("p", { class: "hint" }, "Silinen mesaj: yasaklı kelime nedeniyle ya da panelden silinenler. Güncel ihlal sayacı, \"Standart ceza\" kelimelerinde timeout ve ban sırasını belirler.")];
+      hist && card(`${hist.name} geçmişi`, h("button", { class: "btn small", onclick: () => { hist = null; render(); } }, "Kapat"),
+        h("h4", null, "İhlaller ve silinen mesajlar"),
+        hist.violations.map(v => h("div", { class: "msg" }, h("span", { class: "u" }, new Date(v.at * 1000).toLocaleString("tr-TR")),
+          h("span", { class: "t" }, [RULES[v.rule] || v.rule, ACTIONS[v.action] || v.action, v.detail, ...v.evidence.filter(m => m.user_id === v.user_id).map(m => `"${m.content}"`)].filter(Boolean).join(" · ")))),
+        h("h4", null, "Mesaj geçmişi"),
+        hist.messages.map(m => h("div", { class: "msg" }, h("span", { class: "u" }, new Date(m.at * 1000).toLocaleString("tr-TR")), h("span", { class: "t" }, m.content)))),
+      h("p", { class: "hint" }, "Silinen mesaj: yasaklı kelime nedeniyle ya da panelden silinenler. Geçmiş kayıtlar ve mesajlar sayaç sıfırlansa da silinmez. Güncel ihlal sayacı, \"Standart ceza\" kelimelerinde timeout ve ban sırasını belirler.")];
   },
   inceleme() {
     return [...head("İnceleme", "Botun aldığı aksiyonlar ve senin kararını bekleyen etiketler. Buradan mesaj silebilir, timeout ya da ban atabilir, cezayı kaldırabilirsin."),
@@ -587,7 +594,7 @@ function render() {
   $("main").replaceChildren(...VIEWS[page]().flat(3).filter(Boolean));
   markDirty();
 }
-function go(k) { page = k; location.hash = k; if (k === "kullanici") users = null; if (k === "inceleme") { itemsKey = ""; loadItems(); } else render(); }
+function go(k) { page = k; location.hash = k; if (k === "kullanici") { users = null; hist = null; } if (k === "inceleme") { itemsKey = ""; loadItems(); } else render(); }
 async function loadUsers() {
   try { users = await api("/api/users"); if (page === "kullanici") render(); } catch (e) { toast(e.message, true); }
 }
