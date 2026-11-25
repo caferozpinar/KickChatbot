@@ -1,5 +1,5 @@
 """Kick API: OAuth girişi, token yenileme ve botun kullandığı uç noktalar."""
-import base64, copy, hashlib, http.server, json, secrets, threading, time, tomllib
+import base64, copy, hashlib, http.server, json, re, secrets, threading, time, tomllib
 import urllib.error, urllib.parse, urllib.request
 
 from . import CFG, DATA, SSL, channel, save
@@ -10,6 +10,7 @@ REDIRECT = "http://localhost:8080/callback"
 SCOPES = "user:read channel:read chat:write moderation:ban moderation:chat_message:manage"
 TOKENS = DATA / "tokens.json"
 SECRETS = DATA / "secrets.json"  # panelden girilen Kick uygulama anahtarı
+SESSION = DATA / "session.txt"  # kick.com oturum token'ı: sahip olunan (abonelik) emoteleri için
 _lock = threading.Lock()
 _login = {}  # süren girişin state ve verifier değerleri
 
@@ -29,8 +30,8 @@ def has_app():
     return SECRETS.exists() or (DATA / "secrets.toml").exists()
 
 
-def _http(method, url, *, form=None, body=None, token=None):
-    headers, data = {"User-Agent": "kick-bot"}, None
+def _http(method, url, *, form=None, body=None, token=None, agent="kick-bot"):
+    headers, data = {"User-Agent": agent}, None
     if form is not None:
         data = urllib.parse.urlencode(form).encode()
         headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -199,3 +200,38 @@ def is_live():
         return True
     data = api("GET", "/channels", broadcaster_user_id=_bid())["data"]
     return bool(data and (data[0].get("stream") or {}).get("is_live"))
+
+
+def set_session(token):
+    """Boş verilirse siler. Çerezdeki hali (%7C) de kabul edilir."""
+    token = urllib.parse.unquote(token.strip())
+    if token:
+        _private(SESSION, token)
+    else:
+        SESSION.unlink(missing_ok=True)
+
+
+def emotes():
+    """Kanalda kullanılabilen emoteler, isim -> id: kanalın, global, emoji ve (oturum varsa) sahip olunanlar."""
+    return {e["name"]: e["id"] for g in emote_groups() for e in g["emotes"]}
+
+
+def emote_groups():
+    """Panelin emote seçicisi için gruplar: [{name, emotes: [{id, name}]}]."""
+    session = SESSION.read_text().strip() if SESSION.exists() else None
+    # shortcut: kick.com'un resmi olmayan uç noktası; resmi API emote listesi verirse ona geçilmeli
+    groups = _http("GET", "https://kick.com/emotes/" + urllib.parse.quote(_slug()), token=session, agent="Mozilla/5.0")
+    return [{"name": g.get("name") or g.get("slug") or "Kanal",
+             "emotes": [{"id": e["id"], "name": e["name"]} for e in g["emotes"]]} for g in groups]
+
+
+def _slug():
+    if channel() is None:
+        raise ValueError("Önce bir kanal ekle")
+    return channel()["slug"]
+
+
+def with_emotes(text, table):
+    """Metindeki emote isimlerini chat biçimine ([emote:id:isim]) çevirir; zaten çevrilmiş olanlara dokunmaz."""
+    return re.sub(r"\[emote:[^\]]*\]|[^\s\[\]]+",
+                  lambda m: f"[emote:{table[m[0]]}:{m[0]}]" if m[0] in table else m[0], text)

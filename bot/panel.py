@@ -10,7 +10,7 @@ PAGE = Path(__file__).with_name("panel.html")
 
 def state():
     return {"config": CFG, "open": db.open_count(),
-            "status": {**STATE, "logged_in": kick.logged_in(), "has_app": kick.has_app(), "redirect": kick.REDIRECT, "scopes": kick.SCOPES}}
+            "status": {**STATE, "logged_in": kick.logged_in(), "has_app": kick.has_app(), "session": kick.SESSION.exists(), "redirect": kick.REDIRECT, "scopes": kick.SCOPES}}
 
 
 def violations(query):
@@ -134,7 +134,7 @@ def quit_app(body):
 
 
 ROUTES = {"/api/config": save_config, "/api/action": action, "/api/test": test, "/api/run": run, "/api/login": login,
-          "/api/quit": quit_app, "/api/announce": announce, "/api/spamtest": spam_test, "/api/bye": bye, "/api/resolve": lambda b: {"broadcaster_user_id": kick.resolve(str(b["slug"]))}}
+          "/api/quit": quit_app, "/api/announce": announce, "/api/spamtest": spam_test, "/api/bye": bye, "/api/session": lambda b: kick.set_session(str(b["token"])), "/api/resolve": lambda b: {"broadcaster_user_id": kick.resolve(str(b["slug"]))}}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -175,6 +175,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(200, user_history(urllib.parse.parse_qs(url.query)))
             except (KeyError, ValueError, IndexError):
                 self._json(400, {"error": "Geçersiz istek"})
+        elif url.path == "/api/emotes":
+            try:
+                self._json(200, kick.emote_groups())
+            except Exception as e:
+                self._json(502, {"error": str(e)})
         elif url.path == "/api/violations":
             self._json(200, violations(urllib.parse.parse_qs(url.query)))
         else:

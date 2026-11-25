@@ -4,7 +4,7 @@ import threading
 import unittest
 from unittest import mock
 
-from bot import CFG, DEFAULT, STATE, migrate, announcer, db, listener, llm, moderation, panel, rules, validate
+from bot import CFG, DEFAULT, STATE, migrate, announcer, db, kick, listener, llm, moderation, panel, rules, validate
 
 llm_real = llm  # Handle testlerinde "llm" parametresi sahte modüldür
 
@@ -123,6 +123,11 @@ class Rules(unittest.TestCase):
         self.assertIsNone(announcer.pick([90, 95], 100, 20, 40))       # hepsi çok yeni
         self.assertEqual(announcer.pick([90, 75], 100, 20, 40), 1)     # yalnızca biri min'i geçti
         self.assertEqual(announcer.pick([50, 75, 70], 100, 20, 40), 0)  # süresi dolan öne geçer
+
+    def test_with_emotes(self):
+        t = {"KEKW": 1, "mrdoshdosh1": 2}
+        self.assertEqual(kick.with_emotes("selam KEKW mrdoshdosh1 [emote:1:KEKW] KEKWx KEKW,", t),
+                         "selam [emote:1:KEKW] [emote:2:mrdoshdosh1] [emote:1:KEKW] KEKWx KEKW,")
 
     def test_validate(self):
         self.assertEqual(validate(copy.deepcopy(TEST_CFG)), TEST_CFG)

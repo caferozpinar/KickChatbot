@@ -118,6 +118,17 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
   nav { position: static; flex-direction: row; overflow-x: auto; padding: 10px 14px 0; }
   nav button { white-space: nowrap; } nav button.on { box-shadow: inset 0 -3px 0 var(--accent); }
 }
+.kchat { background: #0b0b0c; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-top: 6px; word-break: break-word; }
+.kchat b { color: var(--accent); margin-right: 4px; }
+.kchat img { height: 28px; vertical-align: middle; margin: 0 1px; }
+.epick { position: relative; }
+.epanel { position: absolute; right: 0; top: 100%; z-index: 10; width: 340px; max-height: 360px; overflow: auto; padding: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.epanel input { width: 100%; margin-bottom: 6px; }
+.epanel h3 { font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+.epanel button { background: none; border: 0; padding: 3px; border-radius: 6px; cursor: pointer; }
+.epanel button:hover { background: var(--raised); }
+.epanel img { width: 32px; height: 32px; object-fit: contain; display: block; }
 </style>
 </head>
 <body>
@@ -190,6 +201,50 @@ function text(path, label, hint) {
 function toggle(path, label, hint) {
   return h("label", { class: "switch" }, h("input", { type: "checkbox", checked: get(path), onchange: e => set(path, e.target.checked) }),
     h("span", null, h("b", null, label), hint && h("span", { class: "hint" }, hint)));
+}
+// Emoteler bir kez çekilir; önizleme ve seçici aynı listeyi kullanır.
+let emoteGroups = null, emoteLoad = null;
+const emoteImg = (id, name) => h("img", { src: `https://files.kick.com/emotes/${id}/fullsize`, alt: name, title: name, loading: "lazy" });
+function loadEmotes() {
+  emoteLoad ??= fetch("/api/emotes").then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); emoteGroups = d; })
+    .catch(e => { emoteLoad = null; toast("Emoteler alınamadı: " + e.message, true); });
+  return emoteLoad;
+}
+// Kick chat görünümü: botun mesajı chatte nasıl görünecekse.
+function kickPreview(box, text) {
+  const draw = () => {
+    const ids = Object.fromEntries((emoteGroups || []).flatMap(g => g.emotes.map(e => [e.name, e.id])));
+    const parts = text.split(/(\[emote:\d+:[^\]]*\]|\s+)/).map(t => {
+      const m = t.match(/^\[emote:(\d+):([^\]]*)\]$/);
+      return m ? emoteImg(m[1], m[2]) : ids[t] ? emoteImg(ids[t], t) : t;
+    });
+    box.replaceChildren(h("b", null, (cfg.nick || "bot") + ":"), ...parts);
+  };
+  draw();
+  if (!emoteGroups) loadEmotes().then(() => emoteGroups && box.isConnected && draw());
+}
+function emotePicker(onPick) {
+  let panel = null;
+  const wrap = h("div", { class: "epick" });
+  const close = e => { if (!wrap.contains(e.target)) { panel?.remove(); panel = null; document.removeEventListener("mousedown", close); } };
+  const open = async () => {
+    if (panel) return close({ target: document.body });
+    await loadEmotes();
+    if (!emoteGroups) return;
+    const list = h("div");
+    const search = h("input", { placeholder: "Emote ara", oninput: () => fill(search.value.toLowerCase()) });
+    const fill = q => list.replaceChildren(...emoteGroups.map(g => {
+      const hits = g.emotes.filter(e => e.name.toLowerCase().includes(q));
+      return hits.length && [h("h3", null, g.name), h("div", null, hits.map(e => h("button", { type: "button", title: e.name, onclick: () => onPick(e.name) }, emoteImg(e.id, e.name))))];
+    }));
+    fill("");
+    panel = h("div", { class: "epanel" }, search, list);
+    wrap.append(panel);
+    search.focus();
+    document.addEventListener("mousedown", close);
+  };
+  wrap.append(h("button", { class: "btn", type: "button", title: "Emote ekle", onclick: open }, "☺"));
+  return wrap;
 }
 const card = (title, ...kids) => h("section", { class: "card" }, title && h("h2", null, title), ...kids);
 const head = (title, lead) => [h("h1", null, title), h("p", { class: "lead" }, lead)];
@@ -450,12 +505,27 @@ const VIEWS = {
       card("Mesajlar",
         list.length ? list.map((m, i) => {
           const counter = h("span", { class: "hint" }, `${m.text.length}/500`);
-          return h("div", { class: "row", style: "margin-bottom:8px;align-items:flex-start" },
+          const preview = h("div", { class: "kchat" });
+          const ta = h("textarea", { maxlength: 500, value: m.text, oninput: () => changed() });
+          const changed = () => { m.text = ta.value; counter.textContent = `${ta.value.length}/500`; kickPreview(preview, ta.value); markDirty(); };
+          kickPreview(preview, m.text);
+          return h("div", { class: "row", style: "margin-bottom:12px;align-items:flex-start" },
             h("input", { type: "checkbox", checked: m.active, title: "Açıkken bu duyuru atılır", onchange: e => { m.active = e.target.checked; markDirty(); } }),
-            h("div", { class: "grow" }, h("textarea", { maxlength: 500, value: m.text, oninput: e => { m.text = e.target.value; counter.textContent = `${e.target.value.length}/500`; markDirty(); } }), counter),
+            h("div", { class: "grow" }, ta, counter, preview),
+            emotePicker(name => { const at = ta.selectionStart ?? ta.value.length, before = ta.value.slice(0, at);
+              const ins = (before && !/\s$/.test(before) ? " " : "") + name + " ";
+              ta.setRangeText(ins, at, ta.selectionEnd ?? at, "end"); ta.focus(); changed(); }),
             h("button", { class: "x", title: "Sil", onclick: () => { list.splice(i, 1); markDirty(); render(); } }, "×"));
         }) : h("div", { class: "empty", style: "margin-bottom:10px" }, "Duyuru yok; bot chate bir şey yazmaz."),
         h("button", { class: "btn", onclick: () => { list.push({ text: "Yeni duyuru", active: true }); markDirty(); render(); } }, "Duyuru ekle")),
+      card("Emoteler", (() => {
+        const tok = h("input", { type: "password", placeholder: status.session ? "Kayıtlı (değiştirmek için yapıştır)" : "session_token değeri" });
+        const send = async v => { try { await api("/api/session", { token: v }); await poll(); render(); toast(v ? "Kaydedildi" : "Silindi"); } catch (e) { toast(e.message, true); } };
+        return [h("p", { class: "hint", style: "margin-top:0" }, "Duyuruda emotenin adını chate yazar gibi yaz (ör. KEKW). Kanalın, global ve emoji emoteleri kendiliğinden çalışır. Senin sahip olduğun emoteler için kick.com oturum token'ı gerekir: tarayıcıda kick.com'a giriş yap, F12 > Application (Depolama) > Cookies > kick.com > session_token değerini kopyala."),
+          h("div", { class: "row" }, h("div", { class: "grow" }, tok),
+            h("button", { class: "btn", onclick: () => send(tok.value) }, "Kaydet"),
+            status.session && h("button", { class: "btn", onclick: () => send("") }, "Sil"))];
+      })()),
       card("Zamanlama", h("div", { class: "grid" },
         num("announcements.gap_minutes", "İki duyuru arası (dk)"),
         num("announcements.repeat_min_minutes", "Aynı duyuru en erken (dk)", "Bu süre dolmadan aynı duyuru tekrar atılmaz."),

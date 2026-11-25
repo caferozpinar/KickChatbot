@@ -28,7 +28,11 @@ def run():
                 i = pick([last.get(m, 0.0) for m in texts], time.time(),
                          c["repeat_min_minutes"] * 60, c["repeat_max_minutes"] * 60)
                 if i is not None:
-                    kick.send(texts[i])
+                    try:
+                        table = kick.emotes()
+                    except Exception as e:  # emote listesi gelmezse duyuru düz metin gider
+                        table, STATE["error"] = {}, f"{time.strftime('%H:%M')} emote listesi: {e}"
+                    kick.send(kick.with_emotes(texts[i], table))
                     last[texts[i]] = time.time()
         except Exception as e:  # ağ hatasında bir sonraki turda tekrar dene
             STATE["error"] = f"{time.strftime('%H:%M')} duyuru: {e}"
