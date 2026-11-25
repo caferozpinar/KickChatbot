@@ -9,7 +9,7 @@ PAGE = Path(__file__).with_name("panel.html")
 
 
 def state():
-    return {"config": CFG, "open": db.open_count(),
+    return {"config": CFG, "open": db.open_count(), "notes": list(moderation.NOTES),
             "status": {**STATE, "logged_in": kick.logged_in(), "has_app": kick.has_app(), "session": kick.SESSION.exists(), "redirect": kick.REDIRECT, "scopes": kick.SCOPES}}
 
 

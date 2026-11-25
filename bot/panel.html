@@ -223,6 +223,18 @@ function kickPreview(box, text) {
   draw();
   if (!emoteGroups) loadEmotes().then(() => emoteGroups && box.isConnected && draw());
 }
+// Emote butonlu ve Kick chat önizlemeli metin alanı. prefix: önizlemede mesajın başına eklenen kısım (ör. "@kullanıcı ").
+function emoteText(value, onChange, max, prefix = "") {
+  const counter = h("span", { class: "hint" }, `${value.length}/${max}`);
+  const preview = h("div", { class: "kchat" });
+  const ta = h("textarea", { maxlength: max, value, oninput: () => changed() });
+  const changed = () => { counter.textContent = `${ta.value.length}/${max}`; kickPreview(preview, prefix + ta.value); onChange(ta.value); };
+  kickPreview(preview, prefix + value);
+  return h("div", { class: "row grow", style: "align-items:flex-start" },
+    h("div", { class: "grow" }, ta, counter, preview),
+    emotePicker(name => { const at = ta.selectionStart ?? ta.value.length, before = ta.value.slice(0, at);
+      ta.setRangeText((before && !/\s$/.test(before) ? " " : "") + name + " ", at, ta.selectionEnd ?? at, "end"); ta.focus(); changed(); }));
+}
 function emotePicker(onPick) {
   let panel = null;
   const wrap = h("div", { class: "epick" });
@@ -284,8 +296,11 @@ function wordDialog(w) {
       h("label", { class: "switch field" }, h("input", { type: "checkbox", checked: w.targeted, onchange: e => { w.targeted = e.target.checked; markDirty(); } }),
         h("span", null, h("b", null, "Yalnızca birine yöneltilmişse yasak"),
           h("span", { class: "hint" }, "Kelime tek başına serbest olur (\"amk yoruldum\"); birine söylenmişse (\"sen amk\") yapay zekâ ya da sen karar verirsin. Bu seçenekte yukarıdaki ceza seçimi kullanılmaz."))),
+      h("label", { class: "switch field" }, h("input", { type: "checkbox", checked: w.notify, onchange: e => { w.notify = e.target.checked; markDirty(); } }),
+        h("span", null, h("b", null, "Kullanılınca bana bildirim gönder"),
+          h("span", { class: "hint" }, "Panel açıkken ekrana bildirim düşer; tıklayınca yazan kişinin geçmişi açılır."))),
       h("div", { class: "row", style: "justify-content:space-between;margin-top:18px" },
-        h("button", { class: "btn", onclick: () => { Object.assign(w, { match: "variants", targeted: false, action: "standard", minutes: 0 }); markDirty(); draw(); } }, "Standarda döndür"),
+        h("button", { class: "btn", onclick: () => { Object.assign(w, { match: "variants", targeted: false, action: "standard", minutes: 0, notify: false }); markDirty(); draw(); } }, "Standarda döndür"),
         h("button", { class: "btn primary", onclick: () => { dlg.close(); } }, "Tamam")));
   };
   dlg.addEventListener("close", () => { dlg.remove(); render(); });
@@ -408,7 +423,7 @@ const VIEWS = {
     const word = h("input", { type: "text", placeholder: "yeni kelime (ör. oç)", onkeydown: e => e.key === "Enter" && add() });
     const probe = h("input", { type: "text", placeholder: "bir mesaj yaz, yakalanıp yakalanmayacağını gör", onkeydown: e => e.key === "Enter" && run() });
     const result = h("div", { class: "result" });
-    const blank = () => ({ word: "", match: "variants", targeted: false, action: "standard", minutes: 0 });  // standart ayarlar
+    const blank = () => ({ word: "", match: "variants", targeted: false, action: "standard", minutes: 0, notify: false });  // standart ayarlar
     function add() {
       const v = word.value.trim();
       if (!v) return;
@@ -431,6 +446,7 @@ const VIEWS = {
     const summary = w => {
       const parts = [ACTION_NAMES[w.action] + (w.action === "timeout" ? ` (${w.minutes || cfg.blacklist.timeout_minutes} dk)` : "")];
       if (w.targeted) parts.push("yalnızca kişiye yönelikse");
+      if (w.notify) parts.push("bildirim");
       return parts.join(" · ");
     };
     const allowed = cfg.blacklist.allowed;
@@ -470,7 +486,9 @@ const VIEWS = {
         num("caps.streak", "Art arda kaç caps mesajda", "Bu sayıya ulaşınca timeout atılır."),
         num("caps.min_letters", "En az harf sayısı", "Bundan kısa mesajlar caps sayılmaz (GG, XD gibi)."),
         num("caps.timeout_minutes", "Timeout süresi (dk)"))),
-      card("Uyarı mesajı", text("caps.warning", "Chate yazılacak uyarı", "Timeout'tan sonra kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz."))];
+      card("Uyarı mesajı", h("div", { class: "field" }, h("span", null, "Chate yazılacak uyarı"),
+        emoteText(get("caps.warning"), v => set("caps.warning", v), 450, "@kullanıcı "),
+        h("span", { class: "hint" }, "Timeout'tan sonra kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz.")))];
   },
   spam() {
     return [...head("Spam koruması", "Bir kullanıcı art arda yeterince benzer mesajı belirlenen sayıda tekrar ederse susturulur ve chate uyarı yazılır. Kelime sırası, noktalama, büyük/küçük harf ve Türkçe harf farkı (ö/o, ş/s…) önemsenmez. Hızlı yazmak sorun değil. Emote'lar hesaba katılmaz: yalnızca emote içeren mesajlar sayılmaz ve sayacı bozmaz."),
@@ -492,7 +510,9 @@ const VIEWS = {
           } }, "Karşılaştır")), out,
           h("p", { class: "hint" }, "Bot her yeni mesajı kullanıcının bir önceki mesajıyla böyle karşılaştırır. Eşik ve üstüyse sayaç artar, altındaysa sıfırlanır. Sayaç \"kaç tekrarda timeout\" − 1 değerine gelince timeout atılır."));
       })()),
-      card("Uyarı mesajı", text("spam.warning", "Chate yazılacak uyarı", "Kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz, yalnızca timeout atılır."))];
+      card("Uyarı mesajı", h("div", { class: "field" }, h("span", null, "Chate yazılacak uyarı"),
+        emoteText(get("spam.warning"), v => set("spam.warning", v), 450, "@kullanıcı "),
+        h("span", { class: "hint" }, "Kullanıcı etiketlenerek yazılır: \"@ahmet …\". Boş bırakırsan uyarı yazılmaz, yalnızca timeout atılır.")))];
   },
   duyuru() {
     const list = cfg.announcements.messages;
@@ -504,17 +524,9 @@ const VIEWS = {
         h("p", { class: "hint", style: "margin:0" }, "Otomatik: yalnızca yayın açıkken atılır. Başlat: yayın durumu algılanmasa ya da yayın kapalı olsa da atılır. Durdur: hiç atılmaz. Bot durdurulmuşsa (üstteki Durdur) duyuru da atılmaz. Bu seçim uygulama kapanınca Otomatik'e döner.")),
       card("Mesajlar",
         list.length ? list.map((m, i) => {
-          const counter = h("span", { class: "hint" }, `${m.text.length}/500`);
-          const preview = h("div", { class: "kchat" });
-          const ta = h("textarea", { maxlength: 500, value: m.text, oninput: () => changed() });
-          const changed = () => { m.text = ta.value; counter.textContent = `${ta.value.length}/500`; kickPreview(preview, ta.value); markDirty(); };
-          kickPreview(preview, m.text);
           return h("div", { class: "row", style: "margin-bottom:12px;align-items:flex-start" },
             h("input", { type: "checkbox", checked: m.active, title: "Açıkken bu duyuru atılır", onchange: e => { m.active = e.target.checked; markDirty(); } }),
-            h("div", { class: "grow" }, ta, counter, preview),
-            emotePicker(name => { const at = ta.selectionStart ?? ta.value.length, before = ta.value.slice(0, at);
-              const ins = (before && !/\s$/.test(before) ? " " : "") + name + " ";
-              ta.setRangeText(ins, at, ta.selectionEnd ?? at, "end"); ta.focus(); changed(); }),
+            emoteText(m.text, v => { m.text = v; markDirty(); }, 500),
             h("button", { class: "x", title: "Sil", onclick: () => { list.splice(i, 1); markDirty(); render(); } }, "×"));
         }) : h("div", { class: "empty", style: "margin-bottom:10px" }, "Duyuru yok; bot chate bir şey yazmaz."),
         h("button", { class: "btn", onclick: () => { list.push({ text: "Yeni duyuru", active: true }); markDirty(); render(); } }, "Duyuru ekle")),
@@ -537,7 +549,7 @@ const VIEWS = {
       card("Komut listesi",
         list.length ? list.map((c, i) => h("div", { class: "row", style: "margin-bottom:8px;align-items:flex-start" },
           h("input", { type: "text", style: "width:150px", maxlength: 30, placeholder: "!komut", value: c.trigger, oninput: e => { c.trigger = e.target.value.trim(); markDirty(); } }),
-          h("div", { class: "grow" }, h("textarea", { maxlength: 450, placeholder: "cevap metni", value: c.response, oninput: e => { c.response = e.target.value; markDirty(); } })),
+          emoteText(c.response, v => { c.response = v; markDirty(); }, 450, "@kullanıcı "),
           h("button", { class: "x", title: "Sil", onclick: () => { list.splice(i, 1); markDirty(); render(); } }, "×")))
           : h("div", { class: "empty", style: "margin-bottom:10px" }, "Henüz komut yok."),
         h("button", { class: "btn", onclick: () => { list.push({ trigger: "!komut", response: "cevap metni" }); markDirty(); render(); } }, "Komut ekle"),
@@ -676,9 +688,30 @@ async function loadItems() {
     if (page === "inceleme") render();
   } catch (e) { toast(e.message, true); }
 }
+// Masaüstü bildirimi: etiket ve bildirimli yasaklı kelimeler. Panel ilk açıldığında eski olaylar gösterilmez.
+let lastNote = null;
+function showNotes(notes) {
+  const fresh = lastNote === null ? [] : notes.filter(n => n.id > lastNote);
+  if (notes.length) lastNote = Math.max(lastNote ?? 0, ...notes.map(n => n.id));
+  else lastNote ??= 0;
+  for (const n of fresh) {
+    const title = `${n.username} · ${n.kind}`;
+    if (window.Notification && Notification.permission === "granted") {
+      const note = new Notification(title, { body: n.text, tag: "kb" + n.id });
+      note.onclick = () => { window.focus(); openUser(n.user_id, n.username); note.close(); };
+    } else toast(`${title}: ${n.text}`);
+  }
+}
+async function openUser(id, name) {
+  go("kullanici");
+  try { hist = { name, ...await api("/api/user?id=" + id) }; render(); } catch (e) { toast(e.message, true); }
+}
+// Tarayıcı bildirim iznini yalnızca bir tıklamadan sonra sorabilir.
+document.addEventListener("click", () => { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); }, { once: true });
 async function poll() {
   try {
     const s = await api("/api/state"), incoming = JSON.stringify(s.config);
+    showNotes(s.notes || []);
     const changed = JSON.stringify(s.status) !== JSON.stringify(status) || s.open !== openCount || (!cfg || (!isDirty() && incoming !== saved));
     status = s.status; openCount = s.open;
     if (!cfg || (!isDirty() && incoming !== saved)) { cfg = s.config; saved = incoming; }

@@ -158,7 +158,7 @@ def _dry(what):
 def send(text, reply_to=None):
     if _dry(f"chate mesaj yazılır: {text}"):
         return
-    body = {"broadcaster_user_id": _bid(), "content": text[:500], "type": "user"}
+    body = {"broadcaster_user_id": _bid(), "content": with_emotes(text, _emote_table())[:500], "type": "user"}
     if reply_to:
         body["reply_to_message_id"] = reply_to
     api("POST", "/chat", body)
@@ -214,6 +214,20 @@ def set_session(token):
 def emotes():
     """Kanalda kullanılabilen emoteler, isim -> id: kanalın, global, emoji ve (oturum varsa) sahip olunanlar."""
     return {e["name"]: e["id"] for g in emote_groups() for e in g["emotes"]}
+
+
+_emote_cache = [0.0, {}]  # son çekilme zamanı, tablo
+
+
+def _emote_table():
+    """Gönderilen her mesajda emote listesi çekilmesin: 5 dakikada bir yenilenir. Çekilemezse eldeki liste kullanılır."""
+    if time.time() - _emote_cache[0] > 300:
+        try:
+            _emote_cache[:] = [time.time(), emotes()]
+        except Exception as e:
+            _emote_cache[0] = time.time() - 240  # 1 dk sonra tekrar dene
+            print("[emote] liste alınamadı:", e, flush=True)
+    return _emote_cache[1]
 
 
 def emote_groups():

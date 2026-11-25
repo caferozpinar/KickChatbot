@@ -1,5 +1,5 @@
 """Her chat mesajına kuralları uygular: yasaklı kelime, caps, etiket."""
-import threading, time
+import collections, itertools, threading, time
 
 from . import CFG, db, kick, llm, rules
 
@@ -7,6 +7,14 @@ from . import CFG, db, kick, llm, rules
 def blacklist(targeted=False):
     """targeted=False: her zaman yasak kelimeler. True: yalnızca birine yöneltilmişse yasak olanlar."""
     return [w for w in CFG["blacklist"]["words"] if w["targeted"] == targeted]
+
+
+NOTES = collections.deque(maxlen=50)  # panelin masaüstü bildirimi olarak gösterdiği olaylar
+_note_id = itertools.count(1)
+
+
+def notify(kind, uid, name, text):
+    NOTES.append({"id": next(_note_id), "kind": kind, "user_id": uid, "username": name, "text": text[:200]})
 
 
 _last = {}  # komut -> son cevaplanma zamanı
@@ -103,6 +111,8 @@ def handle(ev):
     exempt = rules.is_exempt(ev, CFG["exempt_badges"])
     if not db.add_message(mid, uid, name, text, exempt):
         return
+    if CFG["nick"] and rules.mentions(text, CFG["nick"]) and name.lower() != CFG["nick"].lower():
+        notify("etiket", uid, name, text)
     if helper(ev):
         return
     if not exempt:
@@ -110,6 +120,8 @@ def handle(ev):
         hit = rules.blacklist_hit(text, blacklist(), CFG["blacklist"]["allowed"])
         if hit:
             entry, word = hit
+            if entry.get("notify"):
+                notify(f"yasaklı kelime: {entry['word']}", uid, name, text)
             # "Yalnızca sil" kelimeleri sayaca yazılmaz; diğerleri kullanıcının ihlal sayacını artırır.
             count = 0 if entry["action"] == "delete" else db.bump(uid, "blacklist")
             action = rules.blacklist_action(count, CFG["blacklist"]["strikes_before_timeout"], entry["action"])
@@ -126,6 +138,8 @@ def handle(ev):
         hit = rules.blacklist_hit(text, blacklist(targeted=True), CFG["blacklist"]["allowed"])
         if hit:  # kelime tek başına serbest; birine yöneltilmiş mi, model ya da sen karar verirsin
             word = hit[1]
+            if hit[0].get("notify"):
+                notify(f"hedefli kelime: {hit[0]['word']}", uid, name, text)
             rows = db.recent(CFG["llm"]["context_messages"])
             if CFG["llm"]["enabled"]:
                 print(f"[hedefli kelime] {name}: {text!r} -> '{word}', model yorumluyor...", flush=True)

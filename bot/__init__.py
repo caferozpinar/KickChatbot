@@ -49,7 +49,7 @@ SHAPE = {
     "dry_run": True, "nick": "", "exempt_badges": [""],
     "channel": "",
     "channels": [{"slug": "", "chatroom_id": 1, "broadcaster_user_id": 1}],
-    "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "match": "", "targeted": False, "action": "", "minutes": 1}], "allowed": [""], "decay_minutes": 1},
+    "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "match": "", "targeted": False, "action": "", "minutes": 1, "notify": False}], "allowed": [""], "decay_minutes": 1},
     "caps": {"streak": 1, "min_letters": 1, "timeout_minutes": 1, "warning": ""},
     "llm": {"enabled": False, "url": "", "model": "", "context_messages": 1,
             "dry_run": True, "examples": ""},
@@ -120,7 +120,7 @@ def migrate(cfg):
     cfg["blacklist"] = {**DEFAULT["blacklist"], **cfg["blacklist"]}  # eski dosyada "allowed" yok
     cfg["blacklist"]["words"] = [
         {"word": w["word"], "match": w.get("match") or ("anywhere" if w.get("anywhere") else "variants"),
-         "targeted": w.get("targeted", False), "action": w.get("action", "standard"), "minutes": w.get("minutes", 0)}
+         "targeted": w.get("targeted", False), "action": w.get("action", "standard"), "minutes": w.get("minutes", 0), "notify": w.get("notify", False)}
         for w in cfg["blacklist"]["words"]]
     return cfg
 

@@ -12,8 +12,8 @@ TEST_CFG = {
     "dry_run": True, "nick": "Charasy", "exempt_badges": ["broadcaster", "moderator", "vip"],
     "channel": "test", "channels": [{"slug": "test", "chatroom_id": 1, "broadcaster_user_id": 1}],
     "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "decay_minutes": 30, "allowed": ["ooc"], "words": [
-        {"word": "yarrak", "match": "variants", "targeted": False, "action": "standard", "minutes": 0},
-        {"word": "amk", "match": "variants", "targeted": True, "action": "standard", "minutes": 0}]},
+        {"word": "yarrak", "match": "variants", "targeted": False, "action": "standard", "minutes": 0, "notify": True},
+        {"word": "amk", "match": "variants", "targeted": True, "action": "standard", "minutes": 0, "notify": False}]},
     "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5, "warning": "bağırma"},
     "llm": {"enabled": True, "url": "http://localhost:11434", "model": "m", "context_messages": 5,
             "dry_run": True, "examples": ""},
@@ -248,6 +248,13 @@ class Handle(unittest.TestCase):
             {"word": "a", "anywhere": False, "targeted": False}, {"word": "b", "anywhere": True, "targeted": True}]}}
         words = validate(migrate(old))["blacklist"]["words"]
         self.assertEqual([(w["match"], w["action"], w["minutes"]) for w in words], [("variants", "standard", 0), ("anywhere", "standard", 0)])
+
+    def test_notify(self, llm, kick):
+        moderation.NOTES.clear()
+        moderation.handle(event("selam @charasy", uid=3))  # etiket
+        moderation.handle(event("yarrak", uid=4))           # bildirimli kelime
+        moderation.handle(event("sen amk", uid=5))          # bildirimsiz kelime
+        self.assertEqual([(n["kind"], n["user_id"]) for n in moderation.NOTES], [("etiket", 3), ("yasaklı kelime: yarrak", 4)])
 
     def test_caps_streak(self, llm, kick):
         for _ in range(4):
