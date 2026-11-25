@@ -233,9 +233,9 @@ function emotePicker(onPick) {
     if (!emoteGroups) return;
     const list = h("div");
     const search = h("input", { placeholder: "Emote ara", oninput: () => fill(search.value.toLowerCase()) });
-    const fill = q => list.replaceChildren(...emoteGroups.map(g => {
+    const fill = q => list.replaceChildren(...emoteGroups.flatMap(g => {
       const hits = g.emotes.filter(e => e.name.toLowerCase().includes(q));
-      return hits.length && [h("h3", null, g.name), h("div", null, hits.map(e => h("button", { type: "button", title: e.name, onclick: () => onPick(e.name) }, emoteImg(e.id, e.name))))];
+      return hits.length ? [h("h3", null, g.name), h("div", null, hits.map(e => h("button", { type: "button", title: e.name, onclick: () => onPick(e.name) }, emoteImg(e.id, e.name))))] : [];
     }));
     fill("");
     panel = h("div", { class: "epanel" }, search, list);
