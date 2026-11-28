@@ -9,7 +9,7 @@ from bot import CFG, DEFAULT, STATE, migrate, announcer, db, kick, listener, llm
 llm_real = llm  # Handle testlerinde "llm" parametresi sahte modüldür
 
 TEST_CFG = {
-    "dry_run": True, "nick": "Charasy", "exempt_badges": ["broadcaster", "moderator", "vip"],
+    "dry_run": True, "nick": "Charasy", "exempt_badges": ["broadcaster", "moderator", "vip"], "reset_seconds": 60,
     "channel": "test", "channels": [{"slug": "test", "chatroom_id": 1, "broadcaster_user_id": 1}],
     "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "decay_minutes": 30, "allowed": ["ooc"], "words": [
         {"word": "yarrak", "match": "variants", "targeted": False, "action": "standard", "minutes": 0, "notify": True},
@@ -267,6 +267,18 @@ class Handle(unittest.TestCase):
         kick.timeout.assert_called_once()
         kick.send.assert_called_once_with("@u7 bağırma")
         self.assertEqual(len(json.loads(db.violations(1)[0]["evidence"])), 5)
+
+    def test_window(self, llm, kick):
+        t = [1000.0]
+        with mock.patch("time.time", lambda: t[0]):
+            for _ in range(5):                                     # 2 dk arayla caps: timeout yok
+                moderation.handle(event("BAĞIRIYORUM", uid=30)); t[0] += 120
+            for _ in range(3):                                     # 2 dk arayla aynı mesaj: spam değil
+                moderation.handle(event("tamamen farklı bir cümle", uid=31)); t[0] += 120
+            kick.timeout.assert_not_called()
+            for _ in range(3):
+                moderation.handle(event("tamamen farklı bir cümle", uid=31)); t[0] += 10
+            kick.timeout.assert_called_once()
 
     def test_spam(self, llm, kick):
         moderation.handle(event("bu akşam maç var mı", uid=20))

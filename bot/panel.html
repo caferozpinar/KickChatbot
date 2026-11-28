@@ -484,6 +484,7 @@ const VIEWS = {
     return [...head("Büyük harf (caps)", "Tamamı büyük harf olan mesajlar art arda gelirse timeout atılır. Araya normal bir mesaj girince sayaç sıfırlanır."),
       card(null, h("div", { class: "grid" },
         num("caps.streak", "Art arda kaç caps mesajda", "Bu sayıya ulaşınca timeout atılır."),
+        num("reset_seconds", "Sıfırlama süresi (sn)", "Kullanıcı bu kadar süre yazmazsa caps ve spam sayaçları birlikte sıfırlanır. Spam sayfasındakiyle aynı ayardır."),
         num("caps.min_letters", "En az harf sayısı", "Bundan kısa mesajlar caps sayılmaz (GG, XD gibi)."),
         num("caps.timeout_minutes", "Timeout süresi (dk)"))),
       card("Uyarı mesajı", h("div", { class: "field" }, h("span", null, "Chate yazılacak uyarı"),
@@ -496,6 +497,7 @@ const VIEWS = {
       card("Ayarlar", h("div", { class: "grid" },
         num("spam.similarity_percent", "Benzerlik yüzdesi (1-100)", "Ardışık iki mesaj kelime kelime kıyaslanır; bu yüzde ve üstü benzerlik \"aynı mesaj\" sayılır. Örnek: \"selam nasılsınız\" ile \"selam nasılsınız herkes\" %80 benzer."),
         num("spam.repeat_count", "Kaç tekrarda timeout", "Art arda bu kadar benzer mesaj atılınca (sonuncusu dahil) timeout atılır; yani benzer çift sayısı bunun 1 eksiği olunca. Genelde 3; 2 ile 50 arası."),
+        num("reset_seconds", "Sıfırlama süresi (sn)", "Kullanıcı bu kadar süre yazmazsa spam ve caps sayaçları birlikte sıfırlanır. Caps sayfasındakiyle aynı ayardır."),
         num("spam.min_words", "En az kelime sayısı", "Bundan kısa mesajlar kontrol edilmez (\"selam\", \"gg\" tekrarı spam sayılmasın)."),
         num("spam.timeout_minutes", "Timeout süresi (dk)"))),
       card("Dene", (() => {

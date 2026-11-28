@@ -116,6 +116,10 @@ def handle(ev):
     if helper(ev):
         return
     if not exempt:
+        last = db.recent(2, uid)[:-1]
+        if last and time.time() - last[0]["at"] > CFG["reset_seconds"]:  # uzun süre yazmayanın caps ve spam serisi baştan başlar
+            db.reset(uid, "caps")
+            db.reset(uid, "spam")
         me = {"id": mid, "user_id": uid, "username": name, "content": text}
         hit = rules.blacklist_hit(text, blacklist(), CFG["blacklist"]["allowed"])
         if hit:
@@ -153,7 +157,7 @@ def handle(ev):
             prev = next((m for m in reversed(db.recent(10, uid)[:-1]) if rules.normalize(m["content"]).split()), None)
             if prev:
                 sim = rules.similarity(prev["content"], text)
-                if sim < sp["similarity_percent"]:
+                if sim < sp["similarity_percent"] or time.time() - prev["at"] > CFG["reset_seconds"]:  # araya emote girse de eski mesaj tekrar sayılmaz
                     db.reset(uid, "spam")
                 else:
                     count = db.bump(uid, "spam")

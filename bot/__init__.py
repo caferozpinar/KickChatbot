@@ -31,7 +31,7 @@ STATE = {"chat": False, "live": None, "error": "", "running": False, "announce":
 
 # Yeni kurulumun ayarı: güvenli taraf (yazdırma modu açık, model kapalı, liste boş).
 DEFAULT = {
-    "dry_run": True, "nick": "", "exempt_badges": ["broadcaster", "moderator", "vip"],
+    "dry_run": True, "nick": "", "exempt_badges": ["broadcaster", "moderator", "vip"], "reset_seconds": 60,
     "channel": "", "channels": [],
     "blacklist": {"strikes_before_timeout": 3, "timeout_minutes": 10, "words": [], "allowed": [], "decay_minutes": 30},
     "caps": {"streak": 5, "min_letters": 4, "timeout_minutes": 5, "warning": "lütfen büyük harfle yazma."},
@@ -46,7 +46,7 @@ DEFAULT = {
 
 # Ayar dosyasının biçimi. Listelerdeki tek eleman, liste elemanlarının şablonudur.
 SHAPE = {
-    "dry_run": True, "nick": "", "exempt_badges": [""],
+    "dry_run": True, "nick": "", "exempt_badges": [""], "reset_seconds": 1,
     "channel": "",
     "channels": [{"slug": "", "chatroom_id": 1, "broadcaster_user_id": 1}],
     "blacklist": {"strikes_before_timeout": 1, "timeout_minutes": 1, "words": [{"word": "", "match": "", "targeted": False, "action": "", "minutes": 1, "notify": False}], "allowed": [""], "decay_minutes": 1},
