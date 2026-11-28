@@ -24,7 +24,9 @@ jobs:
           python-version: "3.13"
       - run: pip install pyinstaller -r requirements.txt
       - run: python -m unittest discover tests
-      - run: pyinstaller --onefile --noconsole --name kick-bot --icon assets/icon.ico --add-data "bot/panel.html:bot" run.py
+      - run: echo "${{ github.ref_name }}" > bot/VERSION
+        shell: bash  # PowerShell dosyayı UTF-16 yazar
+      - run: pyinstaller --onefile --noconsole --name kick-bot --icon assets/icon.ico --add-data "bot/panel.html:bot" --add-data "bot/VERSION:bot" run.py
       - if: runner.os == 'Linux'
         run: mv dist/kick-bot dist/kick-bot-linux
       - uses: softprops/action-gh-release@v2

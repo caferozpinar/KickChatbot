@@ -27,6 +27,8 @@ except ImportError:
 
 DATA = _data_dir()
 CONFIG = DATA / "config.json"
+_V = Path(__file__).with_name("VERSION")
+VERSION = _V.read_text().strip() if _V.exists() else "geliştirme"  # derlemede release.yml etiketi yazar
 STATE = {"chat": False, "live": None, "error": "", "running": False, "announce": "auto"}  # panelde gösterilen anlık durum
 
 # Yeni kurulumun ayarı: güvenli taraf (yazdırma modu açık, model kapalı, liste boş).

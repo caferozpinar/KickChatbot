@@ -1,7 +1,7 @@
 """kick-bot [run | log | listen]"""
 import json, os, sys, threading, time, traceback, webbrowser
 
-from . import CFG, DATA, STATE, channel, db, kick
+from . import CFG, DATA, STATE, VERSION, channel, db, kick
 
 
 def open_panel(url):
@@ -57,7 +57,7 @@ def main():
         STATE["running"] = bool(channel() and channel()["chatroom_id"])  # kurulum bittiyse açılışta kendiliğinden başlar
         threading.Thread(target=announcer.run, daemon=True).start()
         threading.Thread(target=chat_loop, daemon=True).start()
-        print(f"Bot çalışıyor. Panel: {url}", flush=True)
+        print(f"Bot çalışıyor ({VERSION}). Panel: {url}", flush=True)
         if "--no-browser" not in sys.argv:
             open_panel(url)
         server.serve_forever()

@@ -2,7 +2,7 @@
 import http.server, json, os, threading, urllib.parse
 from pathlib import Path
 
-from . import CFG, STATE, channel, db, kick, llm, moderation, rules, save
+from . import CFG, STATE, VERSION, channel, db, kick, llm, moderation, rules, save
 
 PORT = 8765
 PAGE = Path(__file__).with_name("panel.html")
@@ -158,7 +158,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         url = urllib.parse.urlparse(self.path)
         if url.path == "/":
-            body = PAGE.read_bytes()
+            body = PAGE.read_bytes().replace(b"{{VERSION}}", VERSION.encode())
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))

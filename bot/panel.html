@@ -134,6 +134,7 @@ a.btn { text-decoration: none; display: inline-block; color: var(--accent); }
 <body>
 <header>
   <div class="brand">kick<b>-bot</b></div>
+  <span class="hint" id="version" title="Çalışan sürüm">{{VERSION}}</span>
   <select id="channel" title="Botun çalıştığı kanal" style="width:auto"></select>
   <div class="spacer"></div>
   <div id="pills" class="row"></div>
@@ -722,6 +723,13 @@ async function poll() {
   } catch (e) { status = { ...status, chat: false }; }
 }
 $("save").onclick = () => saveCfg();
+// Çalışan sürümü GitHub'daki son sürümle kıyasla; güncelleme işlemiş mi buradan anlaşılır.
+fetch("https://api.github.com/repos/caferozpinar/KickChatbot/releases/latest").then(r => r.json()).then(r => {
+  const v = $("version"), cur = v.textContent;
+  if (!r.tag_name) return;
+  v.textContent = r.tag_name === cur ? `${cur} (güncel)` : `${cur} · son sürüm: ${r.tag_name}`;
+  if (r.tag_name !== cur) v.style.color = "var(--accent)";
+}).catch(() => {});
 async function power(on) {
   try { await api("/api/run", { on }); await poll(); render(); toast(on ? "Bot başlatıldı" : "Bot durduruldu"); }
   catch (e) { toast(e.message, true); if (!ready()) go("kurulum"); }
